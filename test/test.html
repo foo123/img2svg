@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Image to SVG</title>
+</head>
+<body>
+<script src="../build/img2svg.js"></script>
+<script>
+(function() {
+"use strict";
+
+function el(html)
+{
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    return container.firstChild;
+}
+const img = new Image(), canvas = document.createElement('canvas');
+img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
+    const svg = img2svg(imgData, {depth:2});
+    document.body.appendChild(img);
+    document.body.appendChild(el(svg));
+};
+img.src = './test.jpeg';
+})();
+</script>
+</body>
+</html>

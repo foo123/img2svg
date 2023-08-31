@@ -3,52 +3,99 @@ var stdMath = Math, IMG = 'undefined' !== typeof Uint8Array ? Uint8Array : Array
 function img2svg(imageData, options)
 {
     options = options || {};
-    var colorDepth = stdMath.min(stdMath.max((null == options.colorDepth ? 2 : options.colorDepth), 1), 256),
+    var depth = stdMath.min(stdMath.max((null == options.depth ? 2 : options.depth), 1), 256),
+        depthR = stdMath.min(stdMath.max((null == options.depthR ? depth : options.depthR), 1), 256),
+        depthG = stdMath.min(stdMath.max((null == options.depthG ? depth : options.depthG), 1), 256),
+        depthB = stdMath.min(stdMath.max((null == options.depthB ? depth : options.depthB), 1), 256),
         w = imageData.width, h = imageData.height,
         img = imageData.data, size = w*h, l = img.length,
-        b, g, r, i, q, bq, gq, rq, ir, ig, ib, imgq, area, svg = '';
-    q = stdMath.floor(256 / colorDepth);
-    for (b=0,bq=0; b<colorDepth; ++b,bq+=q)
+        b, g, r, qR, qG, qB,
+        bq, gq, rq, ir, ig, ib,
+        i, j, area, imgq, svg = '';
+    qR = stdMath.floor(256 / depthR);
+    qG = stdMath.floor(256 / depthG);
+    qB = stdMath.floor(256 / depthB);
+    if (options.grayscale)
     {
-        for (g=0,gq=0; g<colorDepth; ++g,gq+=q)
+        for (g=0,gq=0; g<depthG; ++g,gq+=qG)
         {
-            for (r=0,rq=0; r<colorDepth; ++r,rq+=q)
+            imgq = new IMG(size);
+            area = 0;
+            for (i=0,j=0; i<l; i+=4,++j)
             {
-                imgq = new IMG(size);
-                area = 0;
-                for (i=0; i<l; i+=4)
+                if (0 < img[i+3])
                 {
-                    if (0 < img[i+3])
+                    ig = img[i+1];
+                    if (
+                        ig >= gq && ig < gq+qG
+                    )
                     {
-                        ir = img[i  ];
-                        ig = img[i+1];
-                        ib = img[i+2];
-                        if (
-                            ir >= rq && ir < rq+q &&
-                            ig >= gq && ig < gq+q &&
-                            ib >= bq && ib < bq+q
-                        )
-                        {
-                            ++area;
-                            imgq[i >>> 2] = 255;
-                        }
-                        else
-                        {
-                            imgq[i >>> 2] = 0;
-                        }
+                        ++area;
+                        imgq[j] = 255;
                     }
                     else
                     {
-                        imgq[i >>> 2] = 0;
+                        imgq[j] = 0;
                     }
                 }
-                if (0 < area)
+                else
                 {
-                    options.color = hex(rq, gq, bq);
-                    options.partial = true;
-                    svg += potrace.process(imgq, w, h, options);
+                    imgq[j] = 0;
                 }
-                imgq = null;
+            }
+            if (0 < area)
+            {
+                options.color = hex(gq, gq, gq);
+                options.partial = true;
+                svg += potrace.process(imgq, w, h, options);
+            }
+            imgq = null;
+        }
+    }
+    else
+    {
+        for (b=0,bq=0; b<depthB; ++b,bq+=qB)
+        {
+            for (g=0,gq=0; g<depthG; ++g,gq+=qG)
+            {
+                for (r=0,rq=0; r<depthR; ++r,rq+=qR)
+                {
+                    imgq = new IMG(size);
+                    area = 0;
+                    for (i=0,j=0; i<l; i+=4,++j)
+                    {
+                        if (0 < img[i+3])
+                        {
+                            ir = img[i  ];
+                            ig = img[i+1];
+                            ib = img[i+2];
+                            if (
+                                ir >= rq && ir < rq+qR &&
+                                ig >= gq && ig < gq+qG &&
+                                ib >= bq && ib < bq+qB
+                            )
+                            {
+                                ++area;
+                                imgq[j] = 255;
+                            }
+                            else
+                            {
+                                imgq[j] = 0;
+                            }
+                        }
+                        else
+                        {
+                            imgq[j] = 0;
+                        }
+                    }
+                    if (0 < area)
+                    {
+                        options.color = hex(rq, gq, bq);
+                        options.partial = true;
+                        svg += potrace.process(imgq, w, h, options);
+                    }
+                    imgq = null;
+                }
             }
         }
     }
