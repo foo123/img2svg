@@ -97,7 +97,6 @@ function svg_curveto(curve, i, size)
         (curve.c[i * 3 + 2].x * size).toFixed(3) + ' ' +
         (curve.c[i * 3 + 2].y * size).toFixed(3) + ' ';
 }
-
 function svg_lineto(curve, i, size)
 {
     return 'L ' + (curve.c[i * 3 + 1].x * size).toFixed(3) + ' ' +
@@ -128,14 +127,14 @@ Point[PROTO] = {
         return new Point(this.x, this.y);
     };
 };
-function Bitmap(width, height, data)
+function Bitmap(width, height, data, copy)
 {
     var self = this;
     self.width = width;
     self.height = height;
     self.size = width*height;
     self.data = data || (new IMG(self.size));
-    if (data)
+    if (data && !copy)
     {
         for (var i=0; i<size; ++i)
             self.data[i] = (0 === self.data[i] ? 1 : 0);
@@ -185,7 +184,7 @@ Bitmap[PROTO] = {
         this.data[this.width * y + x] = this.at(x, y) ? 0 : 1;
     },
     copy: function() {
-        return new Bitmap(this.width, this.height, this.data.slice());
+        return new Bitmap(this.width, this.height, this.data.slice(), true);
     }
 };
 function Path()
