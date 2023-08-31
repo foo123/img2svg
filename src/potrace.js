@@ -14,12 +14,16 @@ var potrace = {VERSION: "1.16"},
     }
 ;
 
+potrace.defaultOptions = function() {
+    return extend({}, defaults);
+};
 potrace.process = function(imgBW, width, height, options) {
     extend(options, defaults);
-    var bm = new Bitmap(width, height, imgBW),
-        pathlist = bm_to_pathlist(bm, options);
+    var bm = new Bitmap(width, height, imgBW);
+    var pathlist = bm_to_pathlist(bm, options);
+    bm = null;
     process_path(pathlist, options);
-    return svg(bm, pathlist, 1.0, options.color || '#000', options.outline, !options.partial);
+    return svg(width, height, pathlist, 1.0, options.color || '#000', options.outline, !options.partial);
 };
 
 
@@ -36,6 +40,7 @@ function bm_to_pathlist(bm, params)
         xor_path(bm1, path);
         if (path.area > params.turdsize) pathlist.push(path);
     }
+    bm1 = null;
     return pathlist;
 }
 function process_path(pathlist, params)
@@ -52,9 +57,9 @@ function process_path(pathlist, params)
         if (params.optcurve) opticurve(path, params);
     }
 }
-function svg(bm, pathlist, scale, color, outline, full)
+function svg(width, height, pathlist, scale, color, outline, full)
 {
-    var w = bm.width * scale, h = bm.height * scale,
+    var w = width * scale, h = height * scale,
         len = pathlist.length, i, strokec, fillc, fillrule;
 
     var svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
@@ -125,19 +130,19 @@ Point[PROTO] = {
     y: 0,
     copy: function() {
         return new Point(this.x, this.y);
-    };
+    }
 };
-function Bitmap(width, height, data, copy)
+function Bitmap(width, height, data/*, copy*/)
 {
     var self = this;
     self.width = width;
     self.height = height;
     self.size = width*height;
     self.data = data || (new IMG(self.size));
-    if (data && !copy)
+    if (data/* && !copy*/)
     {
-        for (var i=0; i<size; ++i)
-            self.data[i] = (0 === self.data[i] ? 1 : 0);
+        for (var i=0,l=self.size; i<l; ++i)
+            self.data[i] = (0 < self.data[i] ? 1 : 0);
     }
 }
 Bitmap[PROTO] = {
@@ -166,7 +171,7 @@ Bitmap[PROTO] = {
             x = x.x;
         }
         return this.width * y + x;
-    }
+    },
     index: function(i) {
         return new Point(i % this.width, stdMath.floor(i / this.width));
     },
@@ -184,7 +189,9 @@ Bitmap[PROTO] = {
         this.data[this.width * y + x] = this.at(x, y) ? 0 : 1;
     },
     copy: function() {
-        return new Bitmap(this.width, this.height, this.data.slice(), true);
+        var cpy = new Bitmap(this.width, this.height);
+        for (var i=0,l=this.size; i<l; ++i) cpy.data[i] = this.data[i];
+        return cpy;
     }
 };
 function Path()
@@ -226,7 +233,7 @@ function Curve(n)
 }
 Curve[PROTO] = {
     constructor: Curve,
-    n: null,
+    n: 0,
     tag: null,
     c: null,
     alphaCurve: 0,
@@ -309,7 +316,7 @@ function findpath(bm, bm1, point, params)
 {
     var path = new Path(),
         x = point.x, y = point.y,
-        dirx = 0, diry = -1, tmp, c, d, maj;
+        dirx = 0, diry = 1, tmp, c, d, maj;
 
     path.sign = bm.at(point.x, point.y) ? '+' : '-';
 
@@ -324,7 +331,7 @@ function findpath(bm, bm1, point, params)
 
         x += dirx;
         y += diry;
-        path.area += x * diry;
+        path.area -= x * diry;
 
         if (x === point.x && y === point.y) break;
 
@@ -343,27 +350,27 @@ function findpath(bm, bm1, point, params)
             )
             {
                 tmp = dirx;
-                dirx = diry;
-                diry = -tmp;
+                dirx = -diry;
+                diry = tmp;
             }
             else
             {
                 tmp = dirx;
-                dirx = -diry;
-                diry = tmp;
+                dirx = diry;
+                diry = -tmp;
             }
         }
         else if (c)
         {
             tmp = dirx;
-            dirx = diry;
-            diry = -tmp;
+            dirx = -diry;
+            diry = tmp;
         }
         else if (!d)
         {
             tmp = dirx;
-            dirx = -diry;
-            diry = tmp;
+            dirx = diry;
+            diry = -tmp;
         }
     }
     return path;
@@ -395,7 +402,6 @@ function xprod(p1, p2)
 {
     return p1.x*p2.y - p1.y*p2.x;
 }
-
 function cyclic(a, b, c)
 {
     return a <= c ? (a <= b && b < c) : (a <= b || b < c);

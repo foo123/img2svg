@@ -1,0 +1,52 @@
+{
+    "settings": {
+        "Xpresion": "Xpresion::",
+        "RegExp": "RegExp::"
+    },
+
+    "plugins": [
+        {"minify": "!plg:minify"}
+    ],
+
+    "tasks": [
+
+        {"build": [
+
+            {"src":[
+
+                "./src/header.js",
+                "./src/img2svg.js",
+                "./src/potrace.js",
+                "./src/footer.js"
+
+            ]},
+
+            {"header": "./src/header.js"},
+
+            {"replace": [
+
+                {"@@VERSION@@": "1.0.0"},
+                {"@@DATE@@": "Xpresion::date(\"Y-m-d H:i:s\")"}
+
+            ]},
+
+            {"out": "./build/img2svg.js"}
+
+        ]},
+
+        {"minify": [
+
+            {"src": [
+                "./build/img2svg.js"
+            ]},
+
+            {"header": "./build/img2svg.js"},
+
+            {"minify": {
+                "uglifyjs": ["-m -c"]
+            }},
+
+            {"out": "./build/img2svg.min.js"}
+        ]}
+    ]
+}
