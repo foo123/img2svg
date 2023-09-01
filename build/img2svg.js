@@ -2,7 +2,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-01 08:33:59
+*   @built on 2023-09-01 09:31:47
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -11,7 +11,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-01 08:33:59
+*   @built on 2023-09-01 09:31:47
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -41,19 +41,49 @@ function img2svg(imageData, options)
         depthR = clamp(null == options.depthR ? depth : options.depthR, 1, 256),
         depthG = clamp(null == options.depthG ? depth : options.depthG, 1, 256),
         depthB = clamp(null == options.depthB ? depth : options.depthB, 1, 256),
-        depthHue = clamp(null == options.depthHue ? 12 : options.depthHue, 1, 360),
-        w = imageData.width, h = imageData.height,
-        img = imageData.data, size = w*h, l = img.length,
+        //depthHue = clamp(null == options.depthHue ? 12 : options.depthHue, 1, 360),
+        w = imageData.width, h = imageData.height, img = imageData.data,
+        size = w*h, l = img.length, colorMap, rgba, pos,
         b, g, r, h, q, qR, qG, qB, qR2, qG2, qB2, hR, hG, hB,
-        bq, gq, rq, hq, ir, ig, ib, ih, i, j, area, cnt, imgq, svg = '';
-    qR = stdMath.floor(256 / depthR);
-    qG = stdMath.floor(256 / depthG);
-    qB = stdMath.floor(256 / depthB);
-    qR2 = stdMath.floor(qR/2);
-    qG2 = stdMath.floor(qG/2);
-    qB2 = stdMath.floor(qB/2);
-    if (options.grayscale)
+        bq, gq, rq, hq, ir, ig, ib, ia, ih, i, j, k,
+        area, cnt, imgq, svg = '';
+    if (256 === depth)
     {
+        colorMap = {};
+        for (i=0,j=0; i<l; i+=4,++j)
+        {
+            if (0 < img[i+3])
+            {
+                ir = img[i  ];
+                ig = img[i+1];
+                ib = img[i+2];
+                ia = img[i+3];
+                rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
+                if (!colorMap[rgba]) colorMap[rgba] = [j];
+                else colorMap[rgba].push(j);
+            }
+        }
+        for (rgba in colorMap)
+        {
+            if (!Object.prototype.hasOwnProperty.call(colorMap, rgba)) continue;
+            pos = colorMap[rgba];
+            if (0 < pos.length)
+            {
+                imgq = new IMG(size);
+                for (i=0,k=pos.length; i<k; ++i) imgq[pos[i]] = 255;
+                options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
+                options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
+                options.partial = true;
+                svg += potrace.process(imgq, w, h, options);
+                imgq = null;
+            }
+        }
+        colorMap = null;
+    }
+    else if (options.grayscale)
+    {
+        qG = stdMath.floor(256 / depthG);
+        qG2 = stdMath.floor(qG/2);
         for (g=0,gq=0; g<depthG; ++g,gq+=qG)
         {
             imgq = new IMG(size);
@@ -148,6 +178,12 @@ function img2svg(imageData, options)
     }*/
     else
     {
+        qR = stdMath.floor(256 / depthR);
+        qG = stdMath.floor(256 / depthG);
+        qB = stdMath.floor(256 / depthB);
+        qR2 = stdMath.floor(qR/2);
+        qG2 = stdMath.floor(qG/2);
+        qB2 = stdMath.floor(qB/2);
         for (b=0,bq=0; b<depthB; ++b,bq+=qB)
         {
             for (g=0,gq=0; g<depthG; ++g,gq+=qG)
@@ -260,7 +296,7 @@ potrace.process = function(imgBW, width, height, options) {
     var pathlist = bm_to_pathlist(bm, options);
     bm = null;
     process_path(pathlist, options);
-    return svg(width, height, pathlist, 1.0, options.color || '#000', options.outline, !options.partial);
+    return svg(width, height, pathlist, 1.0, options.color || '#000', options.opacity || '1.0', options.outline, !options.partial);
 };
 
 
@@ -294,27 +330,29 @@ function process_path(pathlist, params)
         if (params.optcurve) opticurve(path, params);
     }
 }
-function svg(width, height, pathlist, scale, color, outline, full)
+function svg(width, height, pathlist, scale, color, color_opacity, outline, full)
 {
     var w = width * scale, h = height * scale,
-        len = pathlist.length, i, strokec, fillc, fillrule;
+        len = pathlist.length, i, strokec, fillc, opacity, fillrule;
 
     var svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
     if (outline)
     {
         strokec = color || "#000";
+        opacity = 'stroke-opacity="' + (color_opacity || '1.0') + '"';
         fillc = "none";
         fillrule = '';
     }
     else
     {
-        strokec = "none";
         fillc = color || "#000";
+        opacity = 'fill-opacity="' + (color_opacity || '1.0') + '"';
         fillrule = ' fill-rule="evenodd"';
+        strokec = "none";
     }
     for (i=0; i<len; ++i)
     {
-        svg_code += '<path d="' + svg_path(pathlist[i].curve, scale) + '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule + '/>';
+        svg_code += '<path d="' + svg_path(pathlist[i].curve, scale) + '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule +  opacity +  ' />';
     }
     if (full) svg_code += '</svg>';
     return svg_code;

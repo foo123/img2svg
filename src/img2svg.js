@@ -9,19 +9,49 @@ function img2svg(imageData, options)
         depthR = clamp(null == options.depthR ? depth : options.depthR, 1, 256),
         depthG = clamp(null == options.depthG ? depth : options.depthG, 1, 256),
         depthB = clamp(null == options.depthB ? depth : options.depthB, 1, 256),
-        depthHue = clamp(null == options.depthHue ? 12 : options.depthHue, 1, 360),
-        w = imageData.width, h = imageData.height,
-        img = imageData.data, size = w*h, l = img.length,
+        //depthHue = clamp(null == options.depthHue ? 12 : options.depthHue, 1, 360),
+        w = imageData.width, h = imageData.height, img = imageData.data,
+        size = w*h, l = img.length, colorMap, rgba, pos,
         b, g, r, h, q, qR, qG, qB, qR2, qG2, qB2, hR, hG, hB,
-        bq, gq, rq, hq, ir, ig, ib, ih, i, j, area, cnt, imgq, svg = '';
-    qR = stdMath.floor(256 / depthR);
-    qG = stdMath.floor(256 / depthG);
-    qB = stdMath.floor(256 / depthB);
-    qR2 = stdMath.floor(qR/2);
-    qG2 = stdMath.floor(qG/2);
-    qB2 = stdMath.floor(qB/2);
-    if (options.grayscale)
+        bq, gq, rq, hq, ir, ig, ib, ia, ih, i, j, k,
+        area, cnt, imgq, svg = '';
+    if (256 === depth)
     {
+        colorMap = {};
+        for (i=0,j=0; i<l; i+=4,++j)
+        {
+            if (0 < img[i+3])
+            {
+                ir = img[i  ];
+                ig = img[i+1];
+                ib = img[i+2];
+                ia = img[i+3];
+                rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
+                if (!colorMap[rgba]) colorMap[rgba] = [j];
+                else colorMap[rgba].push(j);
+            }
+        }
+        for (rgba in colorMap)
+        {
+            if (!Object.prototype.hasOwnProperty.call(colorMap, rgba)) continue;
+            pos = colorMap[rgba];
+            if (0 < pos.length)
+            {
+                imgq = new IMG(size);
+                for (i=0,k=pos.length; i<k; ++i) imgq[pos[i]] = 255;
+                options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
+                options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
+                options.partial = true;
+                svg += potrace.process(imgq, w, h, options);
+                imgq = null;
+            }
+        }
+        colorMap = null;
+    }
+    else if (options.grayscale)
+    {
+        qG = stdMath.floor(256 / depthG);
+        qG2 = stdMath.floor(qG/2);
         for (g=0,gq=0; g<depthG; ++g,gq+=qG)
         {
             imgq = new IMG(size);
@@ -116,6 +146,12 @@ function img2svg(imageData, options)
     }*/
     else
     {
+        qR = stdMath.floor(256 / depthR);
+        qG = stdMath.floor(256 / depthG);
+        qB = stdMath.floor(256 / depthB);
+        qR2 = stdMath.floor(qR/2);
+        qG2 = stdMath.floor(qG/2);
+        qB2 = stdMath.floor(qB/2);
         for (b=0,bq=0; b<depthB; ++b,bq+=qB)
         {
             for (g=0,gq=0; g<depthG; ++g,gq+=qG)

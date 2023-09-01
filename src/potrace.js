@@ -23,7 +23,7 @@ potrace.process = function(imgBW, width, height, options) {
     var pathlist = bm_to_pathlist(bm, options);
     bm = null;
     process_path(pathlist, options);
-    return svg(width, height, pathlist, 1.0, options.color || '#000', options.outline, !options.partial);
+    return svg(width, height, pathlist, 1.0, options.color || '#000', options.opacity || '1.0', options.outline, !options.partial);
 };
 
 
@@ -57,27 +57,29 @@ function process_path(pathlist, params)
         if (params.optcurve) opticurve(path, params);
     }
 }
-function svg(width, height, pathlist, scale, color, outline, full)
+function svg(width, height, pathlist, scale, color, color_opacity, outline, full)
 {
     var w = width * scale, h = height * scale,
-        len = pathlist.length, i, strokec, fillc, fillrule;
+        len = pathlist.length, i, strokec, fillc, opacity, fillrule;
 
     var svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
     if (outline)
     {
         strokec = color || "#000";
+        opacity = 'stroke-opacity="' + (color_opacity || '1.0') + '"';
         fillc = "none";
         fillrule = '';
     }
     else
     {
-        strokec = "none";
         fillc = color || "#000";
+        opacity = 'fill-opacity="' + (color_opacity || '1.0') + '"';
         fillrule = ' fill-rule="evenodd"';
+        strokec = "none";
     }
     for (i=0; i<len; ++i)
     {
-        svg_code += '<path d="' + svg_path(pathlist[i].curve, scale) + '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule + '/>';
+        svg_code += '<path d="' + svg_path(pathlist[i].curve, scale) + '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule +  opacity +  ' />';
     }
     if (full) svg_code += '</svg>';
     return svg_code;

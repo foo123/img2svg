@@ -22,7 +22,7 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    const svg = img2svg(imgData, {depth:2});
+    const svg = img2svg(imgData, {depth:5,turdsize:0});
     document.body.appendChild(img);
     document.body.appendChild(el(svg));
 };
