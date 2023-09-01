@@ -2,7 +2,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-08-31 22:24:11
+*   @built on 2023-09-01 08:33:59
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -11,7 +11,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-08-31 22:24:11
+*   @built on 2023-09-01 08:33:59
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -300,8 +300,6 @@ function svg(width, height, pathlist, scale, color, outline, full)
         len = pathlist.length, i, strokec, fillc, fillrule;
 
     var svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
-    svg_code += '<path d="';
-    for (i=0; i<len; ++i) svg_code += svg_path(pathlist[i].curve, scale);
     if (outline)
     {
         strokec = color || "#000";
@@ -314,7 +312,10 @@ function svg(width, height, pathlist, scale, color, outline, full)
         fillc = color || "#000";
         fillrule = ' fill-rule="evenodd"';
     }
-    svg_code += '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule + '/>';
+    for (i=0; i<len; ++i)
+    {
+        svg_code += '<path d="' + svg_path(pathlist[i].curve, scale) + '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule + '/>';
+    }
     if (full) svg_code += '</svg>';
     return svg_code;
 }
@@ -369,14 +370,14 @@ Point[PROTO] = {
         return new Point(this.x, this.y);
     }
 };
-function Bitmap(width, height, data/*, copy*/)
+function Bitmap(width, height, data)
 {
     var self = this;
     self.width = width;
     self.height = height;
     self.size = width*height;
     self.data = data || (new IMG(self.size));
-    if (data/* && !copy*/)
+    if (data)
     {
         for (var i=0,l=self.size; i<l; ++i)
             self.data[i] = (0 < self.data[i] ? 1 : 0);
@@ -401,6 +402,9 @@ Bitmap[PROTO] = {
         }
         return (x >= 0 && x < this.width && y >=0 && y < this.height) && (0 < this.data[this.width * y + x]);
     },
+    index: function(i) {
+        return new Point(i % this.width, stdMath.floor(i / this.width));
+    },
     toIndex: function(x, y) {
         if (x instanceof Point)
         {
@@ -408,9 +412,6 @@ Bitmap[PROTO] = {
             x = x.x;
         }
         return this.width * y + x;
-    },
-    index: function(i) {
-        return new Point(i % this.width, stdMath.floor(i / this.width));
     },
     flip: function(x, y) {
         if (x instanceof Point)
@@ -572,12 +573,12 @@ function findpath(bm, bm1, point, params)
 
         if (x === point.x && y === point.y) break;
 
-        d = bm1.at(x + (dirx + diry - 1 ) / 2, y + (diry - dirx - 1) / 2);
         c = bm1.at(x + (dirx - diry - 1) / 2, y + (diry + dirx - 1) / 2);
+        d = bm1.at(x + (dirx + diry - 1 ) / 2, y + (diry - dirx - 1) / 2);
 
         if (c && !d)
         {
-            maj = majority(bm1, x, y);
+            maj = params.turnpolicy === "majority" || params.turnpolicy === "minority" ? majority(bm1, x, y) : 0;
             if (
             (params.turnpolicy === "right") ||
             (params.turnpolicy === "black" && path.sign === '+') ||
