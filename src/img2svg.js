@@ -142,8 +142,15 @@ function quantize(img, options, params)
         imgq = new IMG(l);
         for (i=0; i<l; i+=4)
         {
-            imgq[i+2] = imgq[i  ] = imgq[i+1] = clamp(stdMath.floor(img[i+1] / qG) * qG /*+ qG2*/, 0, 255);
-            imgq[i+3] = clamp(stdMath.floor(img[i+3] / qA) * qA /*+ qA2*/, 0, 255);
+            if (0 < img[i+3])
+            {
+                imgq[i+2] = imgq[i  ] = imgq[i+1] = clamp(stdMath.floor(img[i+1] / qG) * qG + qG2, 0, 255);
+                imgq[i+3] = clamp(stdMath.floor(img[i+3] / qA) * qA + qA2, 0, 255);
+            }
+            else
+            {
+                imgq[i+3] = imgq[i+2] = imgq[i+1] = imgq[i  ] = 0;
+            }
         }
     }
     else
@@ -160,10 +167,17 @@ function quantize(img, options, params)
         imgq = new IMG(l);
         for (i=0; i<l; i+=4)
         {
-            imgq[i  ] = clamp(stdMath.floor(img[i  ] / qR) * qR /*+ qR2*/, 0, 255);
-            imgq[i+1] = clamp(stdMath.floor(img[i+1] / qG) * qG /*+ qG2*/, 0, 255);
-            imgq[i+2] = clamp(stdMath.floor(img[i+2] / qB) * qB /*+ qB2*/, 0, 255);
-            imgq[i+3] = clamp(stdMath.floor(img[i+3] / qA) * qA /*+ qA2*/, 0, 255);
+            if (0 < img[i+3])
+            {
+                imgq[i  ] = clamp(stdMath.floor(img[i  ] / qR) * qR + qR2, 0, 255);
+                imgq[i+1] = clamp(stdMath.floor(img[i+1] / qG) * qG + qG2, 0, 255);
+                imgq[i+2] = clamp(stdMath.floor(img[i+2] / qB) * qB + qB2, 0, 255);
+                imgq[i+3] = clamp(stdMath.floor(img[i+3] / qA) * qA + qA2, 0, 255);
+            }
+            else
+            {
+                imgq[i+3] = imgq[i+2] = imgq[i+1] = imgq[i  ] = 0;
+            }
         }
     }
     return imgq;
