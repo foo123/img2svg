@@ -2,7 +2,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-01 09:31:47
+*   @built on 2023-09-01 19:21:10
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -11,7 +11,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-01 09:31:47
+*   @built on 2023-09-01 19:21:10
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -37,19 +37,173 @@ var stdMath = Math,
 function img2svg(imageData, options)
 {
     options = options || {};
-    var depth = clamp(null == options.depth ? 2 : options.depth, 1, 256),
+    var mode = options.mode || "colored",
+        img = imageData.data, w = imageData.width, h = imageData.height,
+        paths = ''/*[]*/;
+    if ("all_colors" === mode)       paths = process_all_colors(img, w, h, options);
+    else if ("hue" === mode)         paths = process_hue(img, w, h, options);
+    else if ("grayscale" === mode)   paths = process_grayscale(img, w, h, options);
+    else /*if ("colored" === mode)*/ paths = process_colored(img, w, h, options);
+    return '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + paths/*.sort(function(a, b) {return -(a[1] - b[1]);}).map(function(p) {return p[0];}).join('')*/ + '</svg>';
+}
+img2svg.VERSION = "1.0.0";
+
+function process_grayscale(img, w, h, options)
+{
+    var size = w*h, l = img.length,
+        depth = clamp(null == options.depth ? 2 : options.depth, 1, 256),
+        depthG = clamp(null == options.depthG ? depth : options.depthG, 1, 256),
+        qG = stdMath.floor(256 / depthG),
+        qG2 = stdMath.floor(qG/2),
+        g, gq, imgq, area, ig, i, j, paths = '';
+    for (g=0,gq=0; g<depthG; ++g,gq+=qG)
+    {
+        imgq = new IMG(size);
+        area = 0;
+        for (i=0,j=0; i<l; i+=4,++j)
+        {
+            if (0 < img[i+3])
+            {
+                ig = img[i+1];
+                if (
+                    ig >= gq && ig < gq+qG
+                )
+                {
+                    ++area;
+                    imgq[j] = 255;
+                }
+            }
+        }
+        if (0 < area)
+        {
+            options.color = hex(gq+qG2, gq+qG2, gq+qG2);
+            options.partial = true;
+            paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, area])*/;
+        }
+        imgq = null;
+    }
+    return paths;
+}
+function process_colored(img, w, h, options)
+{
+    var size = w*h, l = img.length,
+        depth = clamp(null == options.depth ? 2 : options.depth, 1, 256),
         depthR = clamp(null == options.depthR ? depth : options.depthR, 1, 256),
         depthG = clamp(null == options.depthG ? depth : options.depthG, 1, 256),
         depthB = clamp(null == options.depthB ? depth : options.depthB, 1, 256),
-        //depthHue = clamp(null == options.depthHue ? 12 : options.depthHue, 1, 360),
-        w = imageData.width, h = imageData.height, img = imageData.data,
-        size = w*h, l = img.length, colorMap, rgba, pos,
-        b, g, r, h, q, qR, qG, qB, qR2, qG2, qB2, hR, hG, hB,
-        bq, gq, rq, hq, ir, ig, ib, ia, ih, i, j, k,
-        area, cnt, imgq, svg = '';
-    if (256 === depth)
+        b, g, r, qR, qG, qB, qR2, qG2, qB2,
+        bq, gq, rq, ir, ig, ib, i, j, area, imgq, paths = '';
+    qR = stdMath.floor(256 / depthR);
+    qG = stdMath.floor(256 / depthG);
+    qB = stdMath.floor(256 / depthB);
+    qR2 = stdMath.floor(qR/2);
+    qG2 = stdMath.floor(qG/2);
+    qB2 = stdMath.floor(qB/2);
+    for (b=0,bq=0; b<depthB; ++b,bq+=qB)
     {
-        colorMap = {};
+        for (g=0,gq=0; g<depthG; ++g,gq+=qG)
+        {
+            for (r=0,rq=0; r<depthR; ++r,rq+=qR)
+            {
+                imgq = new IMG(size);
+                area = 0;
+                for (i=0,j=0; i<l; i+=4,++j)
+                {
+                    if (0 < img[i+3])
+                    {
+                        ir = img[i  ];
+                        ig = img[i+1];
+                        ib = img[i+2];
+                        if (
+                            ir >= rq && ir < rq+qR &&
+                            ig >= gq && ig < gq+qG &&
+                            ib >= bq && ib < bq+qB
+                        )
+                        {
+                            ++area;
+                            imgq[j] = 255;
+                        }
+                    }
+                }
+                if (0 < area)
+                {
+                    options.color = rgb(rq+qR2, gq+qG2, bq+qB2);
+                    options.partial = true;
+                    paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, area])*/;
+                }
+                imgq = null;
+            }
+        }
+    }
+    return paths;
+}
+function process_all_colors(img, w, h, options)
+{
+    var size = w*h, l = img.length,
+        colorMap = {}, i, j, k, ir, ig, ib, ia,
+        rgba, pos, imgq, paths = '';
+    for (i=0,j=0; i<l; i+=4,++j)
+    {
+        if (0 < img[i+3])
+        {
+            ir = img[i  ];
+            ig = img[i+1];
+            ib = img[i+2];
+            ia = img[i+3];
+            rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
+            if (!colorMap[rgba]) colorMap[rgba] = [j];
+            else colorMap[rgba].push(j);
+        }
+    }
+    for (rgba in colorMap)
+    {
+        //if (!Object.prototype.hasOwnProperty.call(colorMap, rgba)) continue;
+        pos = colorMap[rgba];
+        if (pos && (0 < pos.length))
+        {
+            imgq = new IMG(size);
+            for (i=0,k=pos.length; i<k; ++i) imgq[pos[i]] = 255;
+            options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
+            options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
+            options.partial = true;
+            paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, k])*/;
+            imgq = null;
+        }
+    }
+    colorMap = null;
+    return paths;
+}
+function process_hue(img, w, h, options)
+{
+    var size = w*h, l = img.length,
+        depth = clamp(null == options.depth ? 6 : options.depth, 1, 360),
+        depthHue = clamp(null == options.depthHue ? depth : options.depthHue, 1, 360),
+        q, h, hq, hR, hG, hB,
+        ir, ig, ib, ia, ih, i, j, k,
+        area, cnt, imgq, paths = '';
+    q = stdMath.floor(360 / depthHue);
+    hR = new F32(360);
+    hG = new F32(360);
+    hB = new F32(360);
+    cnt = new F32(360);
+    for (i=0; i<l; i+=4)
+    {
+        if (0 < img[i+3])
+        {
+            ir = img[i  ];
+            ig = img[i+1];
+            ib = img[i+2];
+            ih = stdMath.floor(hue(ir, ig, ib) / q) * q;
+            hR[ih] = (hR[ih] || 0) + ir;
+            hG[ih] = (hG[ih] || 0) + ig;
+            hB[ih] = (hB[ih] || 0) + ib;
+            cnt[ih] = (cnt[ih] || 0) + 1;
+        }
+    }
+    for (h=0,hq=0; h<depthHue; ++h,hq+=q)
+    {
+        imgq = new IMG(size);
+        area = 0;
         for (i=0,j=0; i<l; i+=4,++j)
         {
             if (0 < img[i+3])
@@ -57,181 +211,24 @@ function img2svg(imageData, options)
                 ir = img[i  ];
                 ig = img[i+1];
                 ib = img[i+2];
-                ia = img[i+3];
-                rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
-                if (!colorMap[rgba]) colorMap[rgba] = [j];
-                else colorMap[rgba].push(j);
-            }
-        }
-        for (rgba in colorMap)
-        {
-            if (!Object.prototype.hasOwnProperty.call(colorMap, rgba)) continue;
-            pos = colorMap[rgba];
-            if (0 < pos.length)
-            {
-                imgq = new IMG(size);
-                for (i=0,k=pos.length; i<k; ++i) imgq[pos[i]] = 255;
-                options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
-                options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
-                options.partial = true;
-                svg += potrace.process(imgq, w, h, options);
-                imgq = null;
-            }
-        }
-        colorMap = null;
-    }
-    else if (options.grayscale)
-    {
-        qG = stdMath.floor(256 / depthG);
-        qG2 = stdMath.floor(qG/2);
-        for (g=0,gq=0; g<depthG; ++g,gq+=qG)
-        {
-            imgq = new IMG(size);
-            area = 0;
-            for (i=0,j=0; i<l; i+=4,++j)
-            {
-                if (0 < img[i+3])
-                {
-                    ig = img[i+1];
-                    if (
-                        ig >= gq && ig < gq+qG
-                    )
-                    {
-                        ++area;
-                        imgq[j] = 255;
-                    }
-                    else
-                    {
-                        imgq[j] = 0;
-                    }
-                }
-                else
-                {
-                    imgq[j] = 0;
-                }
-            }
-            if (0 < area)
-            {
-                options.color = hex(gq+qG2, gq+qG2, gq+qG2);
-                options.partial = true;
-                svg += potrace.process(imgq, w, h, options);
-            }
-            imgq = null;
-        }
-    }
-    /*else if (options.hue)
-    {
-        q = stdMath.floor(360 / depthHue);
-        hR = new F32(360);
-        hG = new F32(360);
-        hB = new F32(360);
-        cnt = new F32(360);
-        for (i=0; i<l; i+=4)
-        {
-            if (0 < img[i+3])
-            {
-                ir = img[i  ];
-                ig = img[i+1];
-                ib = img[i+2];
                 ih = stdMath.floor(hue(ir, ig, ib) / q) * q;
-                hR[ih] = (hR[ih] || 0) + ir;
-                hG[ih] = (hG[ih] || 0) + ig;
-                hB[ih] = (hB[ih] || 0) + ib;
-                cnt[ih] = (cnt[ih] || 0) + 1;
+                if (ih >= hq && ih < hq + q)
+                {
+                    ++area;
+                    imgq[j] = 255;
+                }
             }
         }
-        for (h=0,hq=0; h<depthHue; ++h,hq+=q)
+        if (0 < area && 0 < cnt[hq])
         {
-            imgq = new IMG(size);
-            area = 0;
-            for (i=0,j=0; i<l; i+=4,++j)
-            {
-                if (0 < img[i+3])
-                {
-                    ir = img[i  ];
-                    ig = img[i+1];
-                    ib = img[i+2];
-                    ih = stdMath.floor(hue(ir, ig, ib) / q) * q;
-                    if (ih >= hq && ih < hq + q)
-                    {
-                        ++area;
-                        imgq[j] = 255;
-                    }
-                    else
-                    {
-                        imgq[j] = 0;
-                    }
-                }
-                else
-                {
-                    imgq[j] = 0;
-                }
-            }
-            if (0 < area)
-            {
-                options.color = hex(hR[hq]/cnt[hq], hG[hq]/cnt[hq], hB[hq]/cnt[hq]);
-                options.partial = true;
-                svg += potrace.process(imgq, w, h, options);
-            }
-            imgq = null;
+            options.color = hex(hR[hq]/cnt[hq], hG[hq]/cnt[hq], hB[hq]/cnt[hq]);
+            options.partial = true;
+            paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, area])*/;
         }
-    }*/
-    else
-    {
-        qR = stdMath.floor(256 / depthR);
-        qG = stdMath.floor(256 / depthG);
-        qB = stdMath.floor(256 / depthB);
-        qR2 = stdMath.floor(qR/2);
-        qG2 = stdMath.floor(qG/2);
-        qB2 = stdMath.floor(qB/2);
-        for (b=0,bq=0; b<depthB; ++b,bq+=qB)
-        {
-            for (g=0,gq=0; g<depthG; ++g,gq+=qG)
-            {
-                for (r=0,rq=0; r<depthR; ++r,rq+=qR)
-                {
-                    imgq = new IMG(size);
-                    area = 0;
-                    for (i=0,j=0; i<l; i+=4,++j)
-                    {
-                        if (0 < img[i+3])
-                        {
-                            ir = img[i  ];
-                            ig = img[i+1];
-                            ib = img[i+2];
-                            if (
-                                ir >= rq && ir < rq+qR &&
-                                ig >= gq && ig < gq+qG &&
-                                ib >= bq && ib < bq+qB
-                            )
-                            {
-                                ++area;
-                                imgq[j] = 255;
-                            }
-                            else
-                            {
-                                imgq[j] = 0;
-                            }
-                        }
-                        else
-                        {
-                            imgq[j] = 0;
-                        }
-                    }
-                    if (0 < area)
-                    {
-                        options.color = hex(rq+qR2, gq+qG2, bq+qB2);
-                        options.partial = true;
-                        svg += potrace.process(imgq, w, h, options);
-                    }
-                    imgq = null;
-                }
-            }
-        }
+        imgq = null;
     }
-    return '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">'+svg+'</svg>';
+    return paths;
 }
-img2svg.VERSION = "1.0.0";
 
 // utilities
 function clamp(x, min, max)
@@ -244,6 +241,13 @@ function hex(r, g, b)
         gh = clamp(stdMath.round(g), 0, 255).toString(16),
         bh = clamp(stdMath.round(b), 0, 255).toString(16);
     return '#'+(rh.length < 2 ? '0' : '')+rh+(gh.length < 2 ? '0' : '')+gh+(bh.length < 2 ? '0' : '')+bh;
+}
+function rgb(r, g, b)
+{
+    var rs = String(clamp(stdMath.round(r), 0, 255)),
+        gs = String(clamp(stdMath.round(g), 0, 255)),
+        bs = String(clamp(stdMath.round(b), 0, 255));
+    return 'rgb('+rs+','+gs+','+bs+')';
 }
 function hue(r, g, b)
 {
@@ -271,7 +275,9 @@ function hue(r, g, b)
         h = 60*(4 + (r - g)/c);
     }
     return clamp(stdMath.round(h), 0, 360) % 360;
-}var potrace = (function() {
+}
+
+var potrace = (function() {
 // adapted from:
 // potrace v.1.16 https://potrace.sourceforge.net/potrace.html
 // and https://github.com/kilobtye/potrace
@@ -283,7 +289,8 @@ var potrace = {VERSION: "1.16"},
         turdsize: 2,
         optcurve: true,
         alphamax: 1,
-        opttolerance: 0.2
+        opttolerance: 0.2,
+        minpathsegments: 2
     }
 ;
 
@@ -296,7 +303,7 @@ potrace.process = function(imgBW, width, height, options) {
     var pathlist = bm_to_pathlist(bm, options);
     bm = null;
     process_path(pathlist, options);
-    return svg(width, height, pathlist, 1.0, options.color || '#000', options.opacity || '1.0', options.outline, !options.partial);
+    return svg(width, height, pathlist, options);
 };
 
 
@@ -330,44 +337,54 @@ function process_path(pathlist, params)
         if (params.optcurve) opticurve(path, params);
     }
 }
-function svg(width, height, pathlist, scale, color, color_opacity, outline, full)
+function svg(width, height, pathlist, options)
 {
-    var w = width * scale, h = height * scale,
-        len = pathlist.length, i, strokec, fillc, opacity, fillrule;
+    var scale = +(options.scale || 1.0),
+        color = options.color || '#000',
+        color_opacity = options.opacity || '1.0',
+        outline = options.outline,
+        full = !options.partial,
+        minpathsegments = options.minpathsegments,
+        w = width * scale, h = height * scale,
+        len = pathlist.length, i, path_style,
+        svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
 
-    var svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
     if (outline)
     {
-        strokec = color || "#000";
-        opacity = 'stroke-opacity="' + (color_opacity || '1.0') + '"';
-        fillc = "none";
-        fillrule = '';
+        path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="' + (outline) + '" fill="none"';
     }
     else
     {
-        fillc = color || "#000";
-        opacity = 'fill-opacity="' + (color_opacity || '1.0') + '"';
-        fillrule = ' fill-rule="evenodd"';
-        strokec = "none";
+        path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="0.5" fill="' + (color) + '" fill-opacity="' + (color_opacity) + '" fill-rule="evenodd"';
     }
-    for (i=0; i<len; ++i)
+    if (0 < len)
     {
-        svg_code += '<path d="' + svg_path(pathlist[i].curve, scale) + '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule +  opacity +  ' />';
+        svg_code += '<path '+path_style+' d="';
+        for (i=0; i<len; ++i) svg_code += svg_path(pathlist[i].curve, scale, minpathsegments);
+        svg_code += '" />';
     }
     if (full) svg_code += '</svg>';
     return svg_code;
 }
-function svg_path(curve, size)
+function svg_path(curve, size, minpathsegments)
 {
-    var n = curve.n, i,
+    var n = curve.n, i, cnt = 0,
         p = 'M' + (curve.c[(n - 1) * 3 + 2].x * size).toFixed(3) +
         ' ' + (curve.c[(n - 1) * 3 + 2].y * size).toFixed(3) + ' ';
     for (i=0; i<n; ++i)
     {
-        if (curve.tag[i] === "CURVETO") p += svg_curveto(curve, i, size);
-        else if (curve.tag[i] === "CORNER") p += svg_lineto(curve, i, size);
+        if (curve.tag[i] === "CURVETO")
+        {
+            p += svg_curveto(curve, i, size);
+            cnt += 3;
+        }
+        else if (curve.tag[i] === "CORNER")
+        {
+            p += svg_lineto(curve, i, size);
+            cnt += 2;
+        }
     }
-    return p;
+    return cnt < minpathsegments ? '' : p;
 }
 function svg_curveto(curve, i, size)
 {
@@ -418,7 +435,7 @@ function Bitmap(width, height, data)
     if (data)
     {
         for (var i=0,l=self.size; i<l; ++i)
-            self.data[i] = (0 < self.data[i] ? 1 : 0);
+            data[i] = data[i] ? 1 : 0;
     }
 }
 Bitmap[PROTO] = {

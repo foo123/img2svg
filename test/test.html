@@ -3,6 +3,11 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title>Image to SVG</title>
+<style>
+body {
+    padding: 20px;
+}
+</style>
 </head>
 <body>
 <script src="../build/img2svg.js"></script>
@@ -22,11 +27,12 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    const svg = img2svg(imgData, {depth:5,turdsize:0});
+    const svg = img2svg(imgData, {mode:"colored",depth:5,turdsize:0,minpathsegments:7});
     document.body.appendChild(img);
     document.body.appendChild(el(svg));
 };
 img.src = './test.jpeg';
+//img.src = './peacecolor2.png';//'../_notused/svgcode.png';
 })();
 </script>
 </body>

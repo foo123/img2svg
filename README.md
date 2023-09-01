@@ -2,7 +2,7 @@
 
 Vectorize Image Data to SVG using potrace algorithm v.1.16 with color
 
-**version 1.0.0** (15 kB minified)
+**version 1.0.0** (16 kB minified)
 
 **demo in nodejs with `CanvasLite`:**
 
@@ -14,7 +14,7 @@ img.onload = () => {
     const canvas = new CanvasLite(img.width, img.height);
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    console.log(img2svg(imgData, {depth:5,turdsize:0}));
+    console.log(img2svg(imgData, {mode:"colored",depth:5,turdsize:0,minpathsegments:7}));
 };
 img.src = __dirname + '/test.jpeg';
 ```
@@ -34,7 +34,7 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    const svg = img2svg(imgData, {depth:5,turdsize:0});
+    const svg = img2svg(imgData, {mode:"colored",depth:5,turdsize:0,minpathsegments:7});
     document.body.appendChild(img);
     document.body.appendChild(el(svg));
 };

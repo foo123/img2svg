@@ -10,7 +10,8 @@ var potrace = {VERSION: "1.16"},
         turdsize: 2,
         optcurve: true,
         alphamax: 1,
-        opttolerance: 0.2
+        opttolerance: 0.2,
+        minpathsegments: 2
     }
 ;
 
@@ -23,7 +24,7 @@ potrace.process = function(imgBW, width, height, options) {
     var pathlist = bm_to_pathlist(bm, options);
     bm = null;
     process_path(pathlist, options);
-    return svg(width, height, pathlist, 1.0, options.color || '#000', options.opacity || '1.0', options.outline, !options.partial);
+    return svg(width, height, pathlist, options);
 };
 
 
@@ -57,44 +58,54 @@ function process_path(pathlist, params)
         if (params.optcurve) opticurve(path, params);
     }
 }
-function svg(width, height, pathlist, scale, color, color_opacity, outline, full)
+function svg(width, height, pathlist, options)
 {
-    var w = width * scale, h = height * scale,
-        len = pathlist.length, i, strokec, fillc, opacity, fillrule;
+    var scale = +(options.scale || 1.0),
+        color = options.color || '#000',
+        color_opacity = options.opacity || '1.0',
+        outline = options.outline,
+        full = !options.partial,
+        minpathsegments = options.minpathsegments,
+        w = width * scale, h = height * scale,
+        len = pathlist.length, i, path_style,
+        svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
 
-    var svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
     if (outline)
     {
-        strokec = color || "#000";
-        opacity = 'stroke-opacity="' + (color_opacity || '1.0') + '"';
-        fillc = "none";
-        fillrule = '';
+        path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="' + (outline) + '" fill="none"';
     }
     else
     {
-        fillc = color || "#000";
-        opacity = 'fill-opacity="' + (color_opacity || '1.0') + '"';
-        fillrule = ' fill-rule="evenodd"';
-        strokec = "none";
+        path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="0.5" fill="' + (color) + '" fill-opacity="' + (color_opacity) + '" fill-rule="evenodd"';
     }
-    for (i=0; i<len; ++i)
+    if (0 < len)
     {
-        svg_code += '<path d="' + svg_path(pathlist[i].curve, scale) + '" stroke="' + strokec + '" fill="' + fillc + '"' + fillrule +  opacity +  ' />';
+        svg_code += '<path '+path_style+' d="';
+        for (i=0; i<len; ++i) svg_code += svg_path(pathlist[i].curve, scale, minpathsegments);
+        svg_code += '" />';
     }
     if (full) svg_code += '</svg>';
     return svg_code;
 }
-function svg_path(curve, size)
+function svg_path(curve, size, minpathsegments)
 {
-    var n = curve.n, i,
+    var n = curve.n, i, cnt = 0,
         p = 'M' + (curve.c[(n - 1) * 3 + 2].x * size).toFixed(3) +
         ' ' + (curve.c[(n - 1) * 3 + 2].y * size).toFixed(3) + ' ';
     for (i=0; i<n; ++i)
     {
-        if (curve.tag[i] === "CURVETO") p += svg_curveto(curve, i, size);
-        else if (curve.tag[i] === "CORNER") p += svg_lineto(curve, i, size);
+        if (curve.tag[i] === "CURVETO")
+        {
+            p += svg_curveto(curve, i, size);
+            cnt += 3;
+        }
+        else if (curve.tag[i] === "CORNER")
+        {
+            p += svg_lineto(curve, i, size);
+            cnt += 2;
+        }
     }
-    return p;
+    return cnt < minpathsegments ? '' : p;
 }
 function svg_curveto(curve, i, size)
 {
@@ -145,7 +156,7 @@ function Bitmap(width, height, data)
     if (data)
     {
         for (var i=0,l=self.size; i<l; ++i)
-            self.data[i] = (0 < self.data[i] ? 1 : 0);
+            data[i] = data[i] ? 1 : 0;
     }
 }
 Bitmap[PROTO] = {
