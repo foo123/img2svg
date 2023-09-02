@@ -2,7 +2,7 @@
 
 Vectorize Image Data to SVG using potrace algorithm v.1.16 with color
 
-**version 1.0.0** (17 kB minified)
+**version 1.0.0** (18 kB minified)
 
 **demo in nodejs with `CanvasLite`:**
 

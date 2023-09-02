@@ -11,7 +11,8 @@ var potrace = {VERSION: "1.16"},
         optcurve: true,
         alphamax: 1,
         opttolerance: 0.2,
-        minpathsegments: 2
+        minpathsegments: 2,
+        connectedcomponents: true
     }
 ;
 
@@ -47,7 +48,8 @@ function bm_to_pathlist(bm, params)
             prevpath = path;
         }
     }
-    //pathlist = pathlist_to_tree(pathlist, bm1);
+    if (params.connectedcomponents) pathlist = pathlist_to_connectedcomponents(pathlist);
+    //else if (params.tree) pathlist = pathlist_to_tree(pathlist, bm1);
     bm1 = null;
     return pathlist;
 }
@@ -71,7 +73,6 @@ function svg(width, height, pathlist, options)
         color_opacity = options.opacity || '1.0',
         outline = options.outline,
         full = !options.partial,
-        minpathsegments = options.minpathsegments,
         w = width * scale, h = height * scale,
         path_style, svg_code = '';
 
@@ -84,22 +85,23 @@ function svg(width, height, pathlist, options)
         path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="0.5" fill="' + (color) + '" fill-opacity="' + (color_opacity) + '" fill-rule="evenodd"';
     }
     if (full) svg_code += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">';
-    svg_code += svg_pathlist(pathlist, path_style, scale, minpathsegments);
+    svg_code += svg_pathlist(pathlist, path_style, scale, options.minpathsegments, options.connectedcomponents);
     if (full) svg_code += '</svg>';
     return svg_code;
 }
-function svg_pathlist(path, path_style, scale, minpathsegments, partial)
+function svg_pathlist(path, path_style, scale, minpathsegments, connectedcomponents, partial)
 {
     if (!path) return '';
-    var svg_code = '', svg_code2 = '';
-    svg_code += partial ? '' : ('<path ' + path_style + 'd="');
+    var svg_code = '';
+    if (!connectedcomponents && !partial) svg_code += '<path ' + path_style + ' d="';
     for (; path; path=path.sibling)
     {
+        svg_code += partial ? '' : (connectedcomponents ? ('<path ' + path_style + ' d="') : '');
         svg_code += svg_path(path.curve, scale, minpathsegments);
-        svg_code += svg_pathlist(path.childlist, path_style, scale, minpathsegments, true);
+        svg_code += svg_pathlist(path.childlist, path_style, scale, minpathsegments, connectedcomponents, true);
+        svg_code += partial ? '' : (connectedcomponents ? '" />' : '');
     }
-    //svg_code += svg_code2;
-    svg_code += partial ? '' : '" />';
+    if (!connectedcomponents && !partial) svg_code += '" />';
     return svg_code;
 }
 function svg_path(curve, size, minpathsegments)
@@ -436,6 +438,7 @@ function xor_path(bm1, path)
 }
 function pathlist_to_tree(plist, bm1)
 {
+    // TODO: needs checking
     if (!plist) return null;
     //return plist;
 
@@ -565,6 +568,41 @@ function pathlist_to_tree(plist, bm1)
             }
         }
         heap = heap1;
+    }
+    return plist;
+}
+function intersect(path1, path2)
+{
+    return !(
+        path1.minX > path2.maxX ||
+        path1.minY > path2.maxY ||
+        path1.maxX < path2.minX ||
+        path1.maxY < path2.minY
+    );
+}
+function pathlist_to_connectedcomponents(plist)
+{
+    var p1, p2, pc1, pp2;
+    for (p1=plist; p1; p1=p1.sibling)
+    {
+        pc1 = null;//p1.childlist;
+        for (pp2=p1,p2=p1.next; p2;)
+        {
+            if (intersect(p1, p2))
+            {
+                pp2.sibling = p2.sibling;
+                p2.sibling = null;
+                if (pc1) pc1.sibling = p2;
+                else p1.childlist = p2;
+                pc1 = p2;
+                p2 = pp2.sibling;
+            }
+            else
+            {
+                pp2 = p2;
+                p2 = p2.sibling;
+            }
+        }
     }
     return plist;
 }
