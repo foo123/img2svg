@@ -9,21 +9,21 @@ function img2svg(imageData, options)
         img = imageData.data,
         w = imageData.width,
         h = imageData.height;
-    return '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + process(img, w, h, options, {mode:mode})/*.sort(function(a, b) {return -(a[1] - b[1]);}).map(function(p) {return p[0];}).join('')*/ + '</svg>';
+    return '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + tosvg(img, w, h, options, {mode:mode}) + '</svg>';
 }
 img2svg.VERSION = "@@VERSION@@";
 
-function process(img, w, h, options, params)
+function tosvg(img, w, h, options, params)
 {
-    if (params && ("hue" === params.mode)) return process_hue(img, w, h, options);
-    var colorMap = {},
-        i, j, k, l, size,
+    if (params && ("hue" === params.mode)) return tosvg_hue(img, w, h, options);
+    var colors = {},
+        i, j, k, p, l, size,
         ir, ig, ib, ia,
-        rgba, pos, imgq, paths = '';
+        rgba, imgq, paths = '';
     img = quantize(img, options, params);
     size = w*h;
     l = img.length;
-    if (params && ("grayscale" === params.mode))
+    if (params && ("gray" === params.mode))
     {
         for (i=0,j=0; i<l; i+=4,++j)
         {
@@ -31,10 +31,9 @@ function process(img, w, h, options, params)
             {
                 ig = img[i+1];
                 ia = img[i+3];
-                rgba = String(ig)
+                rgba = String(ig);
                 rgba += ','+rgba+','+rgba+','+String(ia);
-                if (!colorMap[rgba]) colorMap[rgba] = [j];
-                else colorMap[rgba].push(j);
+                colors[rgba] = [j, colors[rgba] || null];
             }
         }
     }
@@ -49,77 +48,76 @@ function process(img, w, h, options, params)
                 ib = img[i+2];
                 ia = img[i+3];
                 rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
-                if (!colorMap[rgba]) colorMap[rgba] = [j];
-                else colorMap[rgba].push(j);
+                colors[rgba] = [j, colors[rgba] || null];
             }
         }
     }
-    for (rgba in colorMap)
+    for (rgba in colors)
     {
-        //if (!Object.prototype.hasOwnProperty.call(colorMap, rgba)) continue;
-        pos = colorMap[rgba];
-        if (pos && (0 < pos.length))
+        //if (!Object.prototype.hasOwnProperty.call(colors, rgba)) continue;
+        p = colors[rgba];
+        if (p && p.length)
         {
             imgq = new IMG(size);
-            for (i=0,k=pos.length; i<k; ++i) imgq[pos[i]] = 255;
+            for (; null!=p; p=p[1]) imgq[p[0]] = 255;
             options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
             options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
             options.partial = true;
-            paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, k])*/;
+            paths += potrace.trace(imgq, w, h, options);
             imgq = null;
+            colors[rgba] = null;
         }
     }
-    colorMap = null;
+    colors = null;
     return paths;
 }
-function process_hue(img, w, h, options)
+function tosvg_hue(img, w, h, options)
 {
     var size = w*h, l = img.length,
         depth = clamp(null == options.depth ? 6 : options.depth, 1, 360),
         depthHue = clamp(null == options.depthHue ? depth : options.depthHue, 1, 360),
-        q, h, hq, hR, hG, hB,
-        ir, ig, ib, ih, i, j, k,
-        cnt, pos, p, imgq, paths = '';
+        q, h, hR, hG, hB,
+        ir, ig, ib, i, j, k, p,
+        area, pos, imgq, paths = '';
     q = stdMath.floor(360 / depthHue);
-    hR = new F32(360);
-    hG = new F32(360);
-    hB = new F32(360);
-    cnt = new F32(360);
-    pos = new Array(360);
+    hR = new F32(depthHue);
+    hG = new F32(depthHue);
+    hB = new F32(depthHue);
+    area = new F32(depthHue);
+    pos = new Array(depthHue);
     for (i=0,j=0; i<l; i+=4,++j)
     {
         if (0 < img[i+3])
         {
-            ir = img[i  ];
-            ig = img[i+1];
-            ib = img[i+2];
-            ih = stdMath.floor(hue(ir, ig, ib) / q) * q;
-            hR[ih] = (hR[ih] || 0) + ir;
-            hG[ih] = (hG[ih] || 0) + ig;
-            hB[ih] = (hB[ih] || 0) + ib;
-            cnt[ih] = (cnt[ih] || 0) + 1;
-            pos[ih] = pos[ih] || [];
-            pos[ih].push(j);
+            ir = img[i  ]/255;
+            ig = img[i+1]/255;
+            ib = img[i+2]/255;
+            h = stdMath.floor(hue(ir, ig, ib) / q);
+            hR[h] = (hR[h] || 0) + ir;
+            hG[h] = (hG[h] || 0) + ig;
+            hB[h] = (hB[h] || 0) + ib;
+            area[h] = (area[h] || 0) + 1;
+            pos[h] = [j, pos[h] || null];
         }
     }
-    for (h=0,hq=0; h<depthHue; ++h,hq+=q)
+    for (h=0; h<depthHue; ++h)
     {
-        if (0 < cnt[hq])
+        if (0 < area[h])
         {
             imgq = new IMG(size);
-            p = pos[hq];
-            for (i=0,k=p.length; i<k; ++i) imgq[p[i]] = 255;
-            options.color = hex(hR[hq]/cnt[hq], hG[hq]/cnt[hq], hB[hq]/cnt[hq]);
+            p = pos[h];
+            for (p=pos[h]; null!=p; p=p[1]) imgq[p[0]] = 255;
+            options.color = hex(255*hR[h]/area[h], 255*hG[h]/area[h], 255*hB[h]/area[h]);
             options.partial = true;
-            paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, area])*/;
+            paths += potrace.trace(imgq, w, h, options);
             imgq = null;
-            pos[hq] = null;
+            pos[h] = null;
         }
     }
     hR = null;
     hG = null;
     hB = null;
-    cnt = null;
+    area = null;
     pos = null;
     return paths;
 }
@@ -132,7 +130,7 @@ function quantize(img, options, params)
         depthB = clamp(null == options.depthB ? depth : options.depthB, 1, 256),
         depthA = clamp(null == options.depthA ? depth : options.depthA, 1, 256),
         qR, qG, qB, qA, qR2, qG2, qB2, qA2;
-    if (params && ("grayscale" === params.mode))
+    if (params && ("gray" === params.mode))
     {
         if (256 === depthG && 256 === depthA) return img;
         qG = stdMath.floor(256 / depthG);
@@ -205,9 +203,9 @@ function rgb(r, g, b)
 function hue(r, g, b)
 {
     var h, c, xmax, xmin;
-    r /= 255;
+    /*r /= 255;
     g /= 255;
-    b /= 255;
+    b /= 255;*/
     xmax = stdMath.max(r, g, b);
     xmin = stdMath.min(r, g, b);
     c = xmax - xmin;
@@ -227,6 +225,9 @@ function hue(r, g, b)
     {
         h = 60*(4 + (r - g)/c);
     }
-    return clamp(stdMath.round(h), 0, 360) % 360;
+    h = stdMath.round(h);
+    if (h < 0) h += 360;
+    if (h >= 360) h -= 360;
+    return clamp(h, 0, 360);
 }
 

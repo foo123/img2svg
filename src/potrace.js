@@ -18,7 +18,7 @@ var potrace = {VERSION: "1.16"},
 potrace.defaultOptions = function() {
     return extend({}, defaults);
 };
-potrace.process = function(imgBW, width, height, options) {
+potrace.trace = function(imgBW, width, height, options) {
     extend(options, defaults);
     var bm = new Bitmap(width, height, imgBW);
     var pathlist = bm_to_pathlist(bm, options);
@@ -26,6 +26,7 @@ potrace.process = function(imgBW, width, height, options) {
     process_path(pathlist, options);
     return svg(width, height, pathlist, options);
 };
+potrace.process = potrace.trace;
 
 
 // utilities --------------------------------------
@@ -33,22 +34,27 @@ function bm_to_pathlist(bm, params)
 {
     var bm1 = bm.copy(),
         currentPoint = new Point(0, 0),
-        path, pathlist = [];
+        path, prevpath, pathlist;
 
     while (currentPoint = findnext(bm1, currentPoint))
     {
         path = findpath(bm, bm1, currentPoint, params);
         xor_path(bm1, path);
-        if (path.area > params.turdsize) pathlist.push(path);
+        if (path.area > params.turdsize)
+        {
+            if (!pathlist) pathlist = path;
+            if (prevpath) prevpath.next = prevpath.sibling = path;
+            prevpath = path;
+        }
     }
+    //pathlist = pathlist_to_tree(pathlist, bm1);
     bm1 = null;
     return pathlist;
 }
 function process_path(pathlist, params)
 {
-    for (var i=0,l=pathlist.length; i<l; ++i)
+    for (var path = pathlist; path; path=path.next)
     {
-        var path = pathlist[i];
         calc_sums(path);
         calc_lon(path);
         bestpolygon(path);
@@ -67,8 +73,7 @@ function svg(width, height, pathlist, options)
         full = !options.partial,
         minpathsegments = options.minpathsegments,
         w = width * scale, h = height * scale,
-        len = pathlist.length, i, path_style,
-        svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
+        path_style, svg_code = '';
 
     if (outline)
     {
@@ -78,13 +83,23 @@ function svg(width, height, pathlist, options)
     {
         path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="0.5" fill="' + (color) + '" fill-opacity="' + (color_opacity) + '" fill-rule="evenodd"';
     }
-    if (0 < len)
-    {
-        svg_code += '<path '+path_style+' d="';
-        for (i=0; i<len; ++i) svg_code += svg_path(pathlist[i].curve, scale, minpathsegments);
-        svg_code += '" />';
-    }
+    if (full) svg_code += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">';
+    svg_code += svg_pathlist(pathlist, path_style, scale, minpathsegments);
     if (full) svg_code += '</svg>';
+    return svg_code;
+}
+function svg_pathlist(path, path_style, scale, minpathsegments, partial)
+{
+    if (!path) return '';
+    var svg_code = '', svg_code2 = '';
+    svg_code += partial ? '' : ('<path ' + path_style + 'd="');
+    for (; path; path=path.sibling)
+    {
+        svg_code += svg_path(path.curve, scale, minpathsegments);
+        svg_code += svg_pathlist(path.childlist, path_style, scale, minpathsegments, true);
+    }
+    //svg_code += svg_code2;
+    svg_code += partial ? '' : '" />';
     return svg_code;
 }
 function svg_path(curve, size, minpathsegments)
@@ -105,6 +120,7 @@ function svg_path(curve, size, minpathsegments)
             cnt += 2;
         }
     }
+    p += 'z ';
     return cnt < minpathsegments ? '' : p;
 }
 function svg_curveto(curve, i, size)
@@ -148,15 +164,20 @@ Point[PROTO] = {
 };
 function Bitmap(width, height, data)
 {
-    var self = this;
+    var self = this, i, l;
     self.width = width;
     self.height = height;
-    self.size = width*height;
-    self.data = data || (new IMG(self.size));
+    self.size = l = width*height;
+    self.data = new IMG(self.size);
     if (data)
     {
-        for (var i=0,l=self.size; i<l; ++i)
-            data[i] = data[i] ? 1 : 0;
+        for (i=0; i<l; ++i)
+            self.data[i] = data[i] ? 1 : 0;
+    }
+    else
+    {
+        for (i=0; i<l; ++i)
+            self.data[i] = 0;
     }
 }
 Bitmap[PROTO] = {
@@ -231,7 +252,10 @@ Path[PROTO] = {
     minX: 1000000,
     minY: 1000000,
     maxX: -1,
-    maxY: -1
+    maxY: -1,
+    next: null,
+    sibling: null,
+    childlist: null
 };
 function Curve(n)
 {
@@ -305,7 +329,7 @@ Opti[PROTO] = {
 function findnext(bm1, point)
 {
     var i = bm1.toIndex(point);
-    while (i < bm1.size && 0 === bm1.data[i]) ++i;
+    while (i < bm1.size && !bm1.data[i]) ++i;
     return (i < bm1.size) && bm1.index(i);
 }
 function majority(bm1, x, y)
@@ -329,6 +353,7 @@ function majority(bm1, x, y)
 function findpath(bm, bm1, point, params)
 {
     var path = new Path(),
+        pt = path.pt,
         x = point.x, y = point.y,
         dirx = 0, diry = 1, tmp, c, d, maj;
 
@@ -336,7 +361,7 @@ function findpath(bm, bm1, point, params)
 
     while (1)
     {
-        path.pt.push(new Point(x, y));
+        pt.push(new Point(x, y));
         if (x > path.maxX) path.maxX = x;
         if (x < path.minX) path.minX = x;
         if (y > path.maxY) path.maxY = y;
@@ -391,13 +416,14 @@ function findpath(bm, bm1, point, params)
 }
 function xor_path(bm1, path)
 {
-    var y1 = path.pt[0].y,
+    var pt = path.pt,
+        y1 = pt[0].y,
         len = path.len,
         x, y, maxX, minY, i, j, k;
     for (k=1; k<len; ++k)
     {
-        x = path.pt[k].x;
-        y = path.pt[k].y;
+        x = pt[k].x;
+        y = pt[k].y;
 
         if (y !== y1)
         {
@@ -407,6 +433,140 @@ function xor_path(bm1, path)
             y1 = y;
         }
     }
+}
+function pathlist_to_tree(plist, bm1)
+{
+    if (!plist) return null;
+    //return plist;
+
+    var heap = plist, cur, head,
+        p, p1, bbox, x, y, yy,
+        hook_in, hook_out,
+        heap1, hook, plist_hook;
+
+    for (var i=0,l=bm1.size; i<l; ++i) bm1.data[i] = 0;
+    while (heap)
+    {
+        cur = heap;
+        heap = heap.childlist;
+        cur.childlist = null;
+
+        head = cur;
+        cur = cur.next;
+        head.next = null;
+
+        xor_path(bm1, head);
+        bbox = {x0: head.minX, x1: head.maxX, y0: head.minY, y1: head.maxY};
+
+        hook_in = head;
+        hook_out = head;
+        p = cur;
+        while (p)
+        {
+            cur = p.next;
+            p.next = null;
+            if (p.pt[0].y <= bbox.y0)
+            {
+                p.next = hook_out.next;
+                hook_out.next = p;
+                hook_out = p;
+                hook_out.next = cur;
+                break;
+            }
+            if (bm1.at(p.pt[0].x, p.pt[0].y-1))
+            {
+                p.next = hook_in.childlist;
+                hook_in.childlist = p;
+                hook_in = p;
+            }
+            else
+            {
+                p.next = hook_out.next;
+                hook_out.next = p;
+                hook_out = p;
+            }
+            p = cur;
+        }
+
+        for (y=bbox.y0,yy=y*bm1.width; y<bbox.y1; ++y,yy+=bm1.width)
+        {
+            for (x=bbox.x0; x<bbox.x1; ++x)
+            {
+                bm1.data[yy + x] = 0;
+            }
+        }
+
+        if (head.next)
+        {
+            head.next.childlist = heap;
+            heap = head.next;
+        }
+        if (head.childlist)
+        {
+            head.childlist.childlist = heap;
+            heap = head.childlist;
+        }
+    }
+
+    p = plist;
+    while (p)
+    {
+        p1 = p.sibling;
+        p.sibling = p.next;
+        p = p1;
+    }
+
+    heap = plist;
+    if (heap) heap.next = null;
+    plist = null;
+    plist_hook = null;
+    while (heap)
+    {
+        heap1 = heap.next;
+        for (p=heap; p; p=p.sibling)
+        {
+            if (plist_hook)
+            {
+                p.next = plist_hook.next;
+                plist_hook.next = p;
+            }
+            else
+            {
+                p.next = plist;
+                plist = p;
+            }
+            plist_hook = p;
+
+            for (p1=p.childlist; p1; p1=p1.sibling)
+            {
+                if (plist_hook)
+                {
+                    p1.next = plist_hook.next;
+                    plist_hook.next = p1;
+                }
+                else
+                {
+                    p1.next = plist;
+                    plist = p1;
+                }
+                plist_hook = p1;
+                if (p1.childlist)
+                {
+                    for (hook=heap1; hook && hook.next; hook=hook.next) {}
+                    if (heap1 === hook)
+                    {
+                        p1.childlist.next = heap1; heap1 = p1.childlist;
+                    }
+                    else
+                    {
+                        p1.childlist.next = hook.next; hook.next = p1.childlist;
+                    }
+                }
+            }
+        }
+        heap = heap1;
+    }
+    return plist;
 }
 function mod(a, n)
 {
@@ -537,17 +697,17 @@ function tangent(p0, p1, p2, p3, q0, q1)
 }
 function calc_sums(path)
 {
-    var i, x, y;
-    path.x0 = path.pt[0].x;
-    path.y0 = path.pt[0].y;
+    var i, x, y, pt = path.pt;
+    path.x0 = pt[0].x;
+    path.y0 = pt[0].y;
 
     path.sums = [];
     var s = path.sums;
     s.push(new Sum(0, 0, 0, 0, 0));
     for (i=0; i<path.len; ++i)
     {
-        x = path.pt[i].x - path.x0;
-        y = path.pt[i].y - path.y0;
+        x = pt[i].x - path.x0;
+        y = pt[i].y - path.y0;
         s.push(new Sum(s[i].x + x, s[i].y + y, s[i].xy + x * y,
         s[i].x2 + x * x, s[i].y2 + y * y));
     }

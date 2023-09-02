@@ -2,7 +2,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-01 21:47:49
+*   @built on 2023-09-02 13:37:17
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -11,7 +11,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-01 21:47:49
+*   @built on 2023-09-02 13:37:17
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -41,21 +41,21 @@ function img2svg(imageData, options)
         img = imageData.data,
         w = imageData.width,
         h = imageData.height;
-    return '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + process(img, w, h, options, {mode:mode})/*.sort(function(a, b) {return -(a[1] - b[1]);}).map(function(p) {return p[0];}).join('')*/ + '</svg>';
+    return '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + tosvg(img, w, h, options, {mode:mode}) + '</svg>';
 }
 img2svg.VERSION = "1.0.0";
 
-function process(img, w, h, options, params)
+function tosvg(img, w, h, options, params)
 {
-    if (params && ("hue" === params.mode)) return process_hue(img, w, h, options);
-    var colorMap = {},
-        i, j, k, l, size,
+    if (params && ("hue" === params.mode)) return tosvg_hue(img, w, h, options);
+    var colors = {},
+        i, j, k, p, l, size,
         ir, ig, ib, ia,
-        rgba, pos, imgq, paths = '';
+        rgba, imgq, paths = '';
     img = quantize(img, options, params);
     size = w*h;
     l = img.length;
-    if (params && ("grayscale" === params.mode))
+    if (params && ("gray" === params.mode))
     {
         for (i=0,j=0; i<l; i+=4,++j)
         {
@@ -63,10 +63,9 @@ function process(img, w, h, options, params)
             {
                 ig = img[i+1];
                 ia = img[i+3];
-                rgba = String(ig)
+                rgba = String(ig);
                 rgba += ','+rgba+','+rgba+','+String(ia);
-                if (!colorMap[rgba]) colorMap[rgba] = [j];
-                else colorMap[rgba].push(j);
+                colors[rgba] = [j, colors[rgba] || null];
             }
         }
     }
@@ -81,77 +80,76 @@ function process(img, w, h, options, params)
                 ib = img[i+2];
                 ia = img[i+3];
                 rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
-                if (!colorMap[rgba]) colorMap[rgba] = [j];
-                else colorMap[rgba].push(j);
+                colors[rgba] = [j, colors[rgba] || null];
             }
         }
     }
-    for (rgba in colorMap)
+    for (rgba in colors)
     {
-        //if (!Object.prototype.hasOwnProperty.call(colorMap, rgba)) continue;
-        pos = colorMap[rgba];
-        if (pos && (0 < pos.length))
+        //if (!Object.prototype.hasOwnProperty.call(colors, rgba)) continue;
+        p = colors[rgba];
+        if (p && p.length)
         {
             imgq = new IMG(size);
-            for (i=0,k=pos.length; i<k; ++i) imgq[pos[i]] = 255;
+            for (; null!=p; p=p[1]) imgq[p[0]] = 255;
             options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
             options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
             options.partial = true;
-            paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, k])*/;
+            paths += potrace.trace(imgq, w, h, options);
             imgq = null;
+            colors[rgba] = null;
         }
     }
-    colorMap = null;
+    colors = null;
     return paths;
 }
-function process_hue(img, w, h, options)
+function tosvg_hue(img, w, h, options)
 {
     var size = w*h, l = img.length,
         depth = clamp(null == options.depth ? 6 : options.depth, 1, 360),
         depthHue = clamp(null == options.depthHue ? depth : options.depthHue, 1, 360),
-        q, h, hq, hR, hG, hB,
-        ir, ig, ib, ih, i, j, k,
-        cnt, pos, p, imgq, paths = '';
+        q, h, hR, hG, hB,
+        ir, ig, ib, i, j, k, p,
+        area, pos, imgq, paths = '';
     q = stdMath.floor(360 / depthHue);
-    hR = new F32(360);
-    hG = new F32(360);
-    hB = new F32(360);
-    cnt = new F32(360);
-    pos = new Array(360);
+    hR = new F32(depthHue);
+    hG = new F32(depthHue);
+    hB = new F32(depthHue);
+    area = new F32(depthHue);
+    pos = new Array(depthHue);
     for (i=0,j=0; i<l; i+=4,++j)
     {
         if (0 < img[i+3])
         {
-            ir = img[i  ];
-            ig = img[i+1];
-            ib = img[i+2];
-            ih = stdMath.floor(hue(ir, ig, ib) / q) * q;
-            hR[ih] = (hR[ih] || 0) + ir;
-            hG[ih] = (hG[ih] || 0) + ig;
-            hB[ih] = (hB[ih] || 0) + ib;
-            cnt[ih] = (cnt[ih] || 0) + 1;
-            pos[ih] = pos[ih] || [];
-            pos[ih].push(j);
+            ir = img[i  ]/255;
+            ig = img[i+1]/255;
+            ib = img[i+2]/255;
+            h = stdMath.floor(hue(ir, ig, ib) / q);
+            hR[h] = (hR[h] || 0) + ir;
+            hG[h] = (hG[h] || 0) + ig;
+            hB[h] = (hB[h] || 0) + ib;
+            area[h] = (area[h] || 0) + 1;
+            pos[h] = [j, pos[h] || null];
         }
     }
-    for (h=0,hq=0; h<depthHue; ++h,hq+=q)
+    for (h=0; h<depthHue; ++h)
     {
-        if (0 < cnt[hq])
+        if (0 < area[h])
         {
             imgq = new IMG(size);
-            p = pos[hq];
-            for (i=0,k=p.length; i<k; ++i) imgq[p[i]] = 255;
-            options.color = hex(hR[hq]/cnt[hq], hG[hq]/cnt[hq], hB[hq]/cnt[hq]);
+            p = pos[h];
+            for (p=pos[h]; null!=p; p=p[1]) imgq[p[0]] = 255;
+            options.color = hex(255*hR[h]/area[h], 255*hG[h]/area[h], 255*hB[h]/area[h]);
             options.partial = true;
-            paths/*.push(*/ += /*[*/potrace.process(imgq, w, h, options)/*, area])*/;
+            paths += potrace.trace(imgq, w, h, options);
             imgq = null;
-            pos[hq] = null;
+            pos[h] = null;
         }
     }
     hR = null;
     hG = null;
     hB = null;
-    cnt = null;
+    area = null;
     pos = null;
     return paths;
 }
@@ -164,7 +162,7 @@ function quantize(img, options, params)
         depthB = clamp(null == options.depthB ? depth : options.depthB, 1, 256),
         depthA = clamp(null == options.depthA ? depth : options.depthA, 1, 256),
         qR, qG, qB, qA, qR2, qG2, qB2, qA2;
-    if (params && ("grayscale" === params.mode))
+    if (params && ("gray" === params.mode))
     {
         if (256 === depthG && 256 === depthA) return img;
         qG = stdMath.floor(256 / depthG);
@@ -237,9 +235,9 @@ function rgb(r, g, b)
 function hue(r, g, b)
 {
     var h, c, xmax, xmin;
-    r /= 255;
+    /*r /= 255;
     g /= 255;
-    b /= 255;
+    b /= 255;*/
     xmax = stdMath.max(r, g, b);
     xmin = stdMath.min(r, g, b);
     c = xmax - xmin;
@@ -259,7 +257,10 @@ function hue(r, g, b)
     {
         h = 60*(4 + (r - g)/c);
     }
-    return clamp(stdMath.round(h), 0, 360) % 360;
+    h = stdMath.round(h);
+    if (h < 0) h += 360;
+    if (h >= 360) h -= 360;
+    return clamp(h, 0, 360);
 }
 
 var potrace = (function() {
@@ -282,7 +283,7 @@ var potrace = {VERSION: "1.16"},
 potrace.defaultOptions = function() {
     return extend({}, defaults);
 };
-potrace.process = function(imgBW, width, height, options) {
+potrace.trace = function(imgBW, width, height, options) {
     extend(options, defaults);
     var bm = new Bitmap(width, height, imgBW);
     var pathlist = bm_to_pathlist(bm, options);
@@ -290,6 +291,7 @@ potrace.process = function(imgBW, width, height, options) {
     process_path(pathlist, options);
     return svg(width, height, pathlist, options);
 };
+potrace.process = potrace.trace;
 
 
 // utilities --------------------------------------
@@ -297,22 +299,27 @@ function bm_to_pathlist(bm, params)
 {
     var bm1 = bm.copy(),
         currentPoint = new Point(0, 0),
-        path, pathlist = [];
+        path, prevpath, pathlist;
 
     while (currentPoint = findnext(bm1, currentPoint))
     {
         path = findpath(bm, bm1, currentPoint, params);
         xor_path(bm1, path);
-        if (path.area > params.turdsize) pathlist.push(path);
+        if (path.area > params.turdsize)
+        {
+            if (!pathlist) pathlist = path;
+            if (prevpath) prevpath.next = prevpath.sibling = path;
+            prevpath = path;
+        }
     }
+    //pathlist = pathlist_to_tree(pathlist, bm1);
     bm1 = null;
     return pathlist;
 }
 function process_path(pathlist, params)
 {
-    for (var i=0,l=pathlist.length; i<l; ++i)
+    for (var path = pathlist; path; path=path.next)
     {
-        var path = pathlist[i];
         calc_sums(path);
         calc_lon(path);
         bestpolygon(path);
@@ -331,8 +338,7 @@ function svg(width, height, pathlist, options)
         full = !options.partial,
         minpathsegments = options.minpathsegments,
         w = width * scale, h = height * scale,
-        len = pathlist.length, i, path_style,
-        svg_code = full ? ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">') : '';
+        path_style, svg_code = '';
 
     if (outline)
     {
@@ -342,13 +348,23 @@ function svg(width, height, pathlist, options)
     {
         path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="0.5" fill="' + (color) + '" fill-opacity="' + (color_opacity) + '" fill-rule="evenodd"';
     }
-    if (0 < len)
-    {
-        svg_code += '<path '+path_style+' d="';
-        for (i=0; i<len; ++i) svg_code += svg_path(pathlist[i].curve, scale, minpathsegments);
-        svg_code += '" />';
-    }
+    if (full) svg_code += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 '+w+' '+h+'">';
+    svg_code += svg_pathlist(pathlist, path_style, scale, minpathsegments);
     if (full) svg_code += '</svg>';
+    return svg_code;
+}
+function svg_pathlist(path, path_style, scale, minpathsegments, partial)
+{
+    if (!path) return '';
+    var svg_code = '', svg_code2 = '';
+    svg_code += partial ? '' : ('<path ' + path_style + 'd="');
+    for (; path; path=path.sibling)
+    {
+        svg_code += svg_path(path.curve, scale, minpathsegments);
+        svg_code += svg_pathlist(path.childlist, path_style, scale, minpathsegments, true);
+    }
+    //svg_code += svg_code2;
+    svg_code += partial ? '' : '" />';
     return svg_code;
 }
 function svg_path(curve, size, minpathsegments)
@@ -369,6 +385,7 @@ function svg_path(curve, size, minpathsegments)
             cnt += 2;
         }
     }
+    p += 'z ';
     return cnt < minpathsegments ? '' : p;
 }
 function svg_curveto(curve, i, size)
@@ -412,15 +429,20 @@ Point[PROTO] = {
 };
 function Bitmap(width, height, data)
 {
-    var self = this;
+    var self = this, i, l;
     self.width = width;
     self.height = height;
-    self.size = width*height;
-    self.data = data || (new IMG(self.size));
+    self.size = l = width*height;
+    self.data = new IMG(self.size);
     if (data)
     {
-        for (var i=0,l=self.size; i<l; ++i)
-            data[i] = data[i] ? 1 : 0;
+        for (i=0; i<l; ++i)
+            self.data[i] = data[i] ? 1 : 0;
+    }
+    else
+    {
+        for (i=0; i<l; ++i)
+            self.data[i] = 0;
     }
 }
 Bitmap[PROTO] = {
@@ -495,7 +517,10 @@ Path[PROTO] = {
     minX: 1000000,
     minY: 1000000,
     maxX: -1,
-    maxY: -1
+    maxY: -1,
+    next: null,
+    sibling: null,
+    childlist: null
 };
 function Curve(n)
 {
@@ -569,7 +594,7 @@ Opti[PROTO] = {
 function findnext(bm1, point)
 {
     var i = bm1.toIndex(point);
-    while (i < bm1.size && 0 === bm1.data[i]) ++i;
+    while (i < bm1.size && !bm1.data[i]) ++i;
     return (i < bm1.size) && bm1.index(i);
 }
 function majority(bm1, x, y)
@@ -593,6 +618,7 @@ function majority(bm1, x, y)
 function findpath(bm, bm1, point, params)
 {
     var path = new Path(),
+        pt = path.pt,
         x = point.x, y = point.y,
         dirx = 0, diry = 1, tmp, c, d, maj;
 
@@ -600,7 +626,7 @@ function findpath(bm, bm1, point, params)
 
     while (1)
     {
-        path.pt.push(new Point(x, y));
+        pt.push(new Point(x, y));
         if (x > path.maxX) path.maxX = x;
         if (x < path.minX) path.minX = x;
         if (y > path.maxY) path.maxY = y;
@@ -655,13 +681,14 @@ function findpath(bm, bm1, point, params)
 }
 function xor_path(bm1, path)
 {
-    var y1 = path.pt[0].y,
+    var pt = path.pt,
+        y1 = pt[0].y,
         len = path.len,
         x, y, maxX, minY, i, j, k;
     for (k=1; k<len; ++k)
     {
-        x = path.pt[k].x;
-        y = path.pt[k].y;
+        x = pt[k].x;
+        y = pt[k].y;
 
         if (y !== y1)
         {
@@ -671,6 +698,140 @@ function xor_path(bm1, path)
             y1 = y;
         }
     }
+}
+function pathlist_to_tree(plist, bm1)
+{
+    if (!plist) return null;
+    //return plist;
+
+    var heap = plist, cur, head,
+        p, p1, bbox, x, y, yy,
+        hook_in, hook_out,
+        heap1, hook, plist_hook;
+
+    for (var i=0,l=bm1.size; i<l; ++i) bm1.data[i] = 0;
+    while (heap)
+    {
+        cur = heap;
+        heap = heap.childlist;
+        cur.childlist = null;
+
+        head = cur;
+        cur = cur.next;
+        head.next = null;
+
+        xor_path(bm1, head);
+        bbox = {x0: head.minX, x1: head.maxX, y0: head.minY, y1: head.maxY};
+
+        hook_in = head;
+        hook_out = head;
+        p = cur;
+        while (p)
+        {
+            cur = p.next;
+            p.next = null;
+            if (p.pt[0].y <= bbox.y0)
+            {
+                p.next = hook_out.next;
+                hook_out.next = p;
+                hook_out = p;
+                hook_out.next = cur;
+                break;
+            }
+            if (bm1.at(p.pt[0].x, p.pt[0].y-1))
+            {
+                p.next = hook_in.childlist;
+                hook_in.childlist = p;
+                hook_in = p;
+            }
+            else
+            {
+                p.next = hook_out.next;
+                hook_out.next = p;
+                hook_out = p;
+            }
+            p = cur;
+        }
+
+        for (y=bbox.y0,yy=y*bm1.width; y<bbox.y1; ++y,yy+=bm1.width)
+        {
+            for (x=bbox.x0; x<bbox.x1; ++x)
+            {
+                bm1.data[yy + x] = 0;
+            }
+        }
+
+        if (head.next)
+        {
+            head.next.childlist = heap;
+            heap = head.next;
+        }
+        if (head.childlist)
+        {
+            head.childlist.childlist = heap;
+            heap = head.childlist;
+        }
+    }
+
+    p = plist;
+    while (p)
+    {
+        p1 = p.sibling;
+        p.sibling = p.next;
+        p = p1;
+    }
+
+    heap = plist;
+    if (heap) heap.next = null;
+    plist = null;
+    plist_hook = null;
+    while (heap)
+    {
+        heap1 = heap.next;
+        for (p=heap; p; p=p.sibling)
+        {
+            if (plist_hook)
+            {
+                p.next = plist_hook.next;
+                plist_hook.next = p;
+            }
+            else
+            {
+                p.next = plist;
+                plist = p;
+            }
+            plist_hook = p;
+
+            for (p1=p.childlist; p1; p1=p1.sibling)
+            {
+                if (plist_hook)
+                {
+                    p1.next = plist_hook.next;
+                    plist_hook.next = p1;
+                }
+                else
+                {
+                    p1.next = plist;
+                    plist = p1;
+                }
+                plist_hook = p1;
+                if (p1.childlist)
+                {
+                    for (hook=heap1; hook && hook.next; hook=hook.next) {}
+                    if (heap1 === hook)
+                    {
+                        p1.childlist.next = heap1; heap1 = p1.childlist;
+                    }
+                    else
+                    {
+                        p1.childlist.next = hook.next; hook.next = p1.childlist;
+                    }
+                }
+            }
+        }
+        heap = heap1;
+    }
+    return plist;
 }
 function mod(a, n)
 {
@@ -801,17 +962,17 @@ function tangent(p0, p1, p2, p3, q0, q1)
 }
 function calc_sums(path)
 {
-    var i, x, y;
-    path.x0 = path.pt[0].x;
-    path.y0 = path.pt[0].y;
+    var i, x, y, pt = path.pt;
+    path.x0 = pt[0].x;
+    path.y0 = pt[0].y;
 
     path.sums = [];
     var s = path.sums;
     s.push(new Sum(0, 0, 0, 0, 0));
     for (i=0; i<path.len; ++i)
     {
-        x = path.pt[i].x - path.x0;
-        y = path.pt[i].y - path.y0;
+        x = pt[i].x - path.x0;
+        y = pt[i].y - path.y0;
         s.push(new Sum(s[i].x + x, s[i].y + y, s[i].xy + x * y,
         s[i].x2 + x * x, s[i].y2 + y * y));
     }
