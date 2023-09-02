@@ -2,7 +2,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-02 18:17:25
+*   @built on 2023-09-02 19:58:54
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -11,7 +11,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-02 18:17:25
+*   @built on 2023-09-02 19:58:54
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -65,7 +65,7 @@ function tosvg(img, w, h, options, params)
                 ia = img[i+3];
                 rgba = String(ig);
                 rgba += ','+rgba+','+rgba+','+String(ia);
-                colors[rgba] = [j, colors[rgba] || null];
+                colors[rgba] = {j:j, next:colors[rgba] || null};
             }
         }
     }
@@ -80,18 +80,17 @@ function tosvg(img, w, h, options, params)
                 ib = img[i+2];
                 ia = img[i+3];
                 rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
-                colors[rgba] = [j, colors[rgba] || null];
+                colors[rgba] = {j:j, next:colors[rgba] || null};
             }
         }
     }
     for (rgba in colors)
     {
         //if (!Object.prototype.hasOwnProperty.call(colors, rgba)) continue;
-        p = colors[rgba];
-        if (p && p.length)
+        if (p = colors[rgba])
         {
             imgq = new IMG(size);
-            for (; null!=p; p=p[1]) imgq[p[0]] = 255;
+            for (; p; p=p.next) imgq[p.j] = 255;
             options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
             options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
             options.partial = true;
@@ -129,7 +128,7 @@ function tosvg_hue(img, w, h, options)
             hG[h] = (hG[h] || 0) + ig;
             hB[h] = (hB[h] || 0) + ib;
             area[h] = (area[h] || 0) + 1;
-            pos[h] = [j, pos[h] || null];
+            pos[h] = {j:j, next:pos[h] || null};
         }
     }
     for (h=0; h<depthHue; ++h)
@@ -137,8 +136,7 @@ function tosvg_hue(img, w, h, options)
         if (0 < area[h])
         {
             imgq = new IMG(size);
-            p = pos[h];
-            for (p=pos[h]; null!=p; p=p[1]) imgq[p[0]] = 255;
+            for (p=pos[h]; p; p=p.next) imgq[p.j] = 255;
             options.color = hex(255*hR[h]/area[h], 255*hG[h]/area[h], 255*hB[h]/area[h]);
             options.partial = true;
             paths += potrace.trace(imgq, w, h, options);
@@ -271,13 +269,13 @@ var potrace = {VERSION: "1.16"},
     PROTO = 'prototype', stdMath = Math,
     IMG = 'undefined' !== typeof Uint8Array ? Uint8Array : Array,
     defaults = {
+        connectedcomponents: true,
+        minpathsegments: 2,
         turnpolicy: "minority",
         turdsize: 2,
         optcurve: true,
         alphamax: 1,
-        opttolerance: 0.2,
-        minpathsegments: 2,
-        connectedcomponents: true
+        opttolerance: 0.2
     }
 ;
 
@@ -338,9 +336,8 @@ function svg(width, height, pathlist, options)
         color_opacity = options.opacity || '1.0',
         outline = options.outline,
         full = !options.partial,
-        w = width * scale, h = height * scale,
+        w = width*scale, h = height*scale,
         path_style, svg_code = '';
-
     if (outline)
     {
         path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="' + (outline) + '" fill="none"';
@@ -354,41 +351,49 @@ function svg(width, height, pathlist, options)
     if (full) svg_code += '</svg>';
     return svg_code;
 }
-function svg_pathlist(path, path_style, scale, minpathsegments, connectedcomponents, partial)
+function svg_pathlist(path, path_style, scale, minpathsegments, connectedcomponents)
 {
     if (!path) return '';
-    var svg_code = '';
-    if (!connectedcomponents && !partial) svg_code += '<path ' + path_style + ' d="';
+    var svg_code = '', svgpath;
+    if (!connectedcomponents) svg_code += '<path ' + path_style + ' d="';
     for (; path; path=path.sibling)
     {
-        svg_code += partial ? '' : (connectedcomponents ? ('<path ' + path_style + ' d="') : '');
-        svg_code += svg_path(path.curve, scale, minpathsegments);
-        svg_code += svg_pathlist(path.childlist, path_style, scale, minpathsegments, connectedcomponents, true);
-        svg_code += partial ? '' : (connectedcomponents ? '" />' : '');
+        svgpath = svg_path(path, scale);
+        if (svgpath.l < minpathsegments) continue;
+        if (connectedcomponents) svg_code += '<path ' + path_style + ' d="';
+        svg_code += svgpath.d;
+        if (connectedcomponents) svg_code += '" />';
     }
-    if (!connectedcomponents && !partial) svg_code += '" />';
+    if (!connectedcomponents) svg_code += '" />';
     return svg_code;
 }
-function svg_path(curve, size, minpathsegments)
+function svg_path(path, size)
 {
-    var n = curve.n, i, cnt = 0,
-        p = 'M' + (curve.c[(n - 1) * 3 + 2].x * size).toFixed(3) +
+    if (!path) return {d:'', l:0};
+    var curve = path.curve, n = curve.n, i, c, l = 1,
+        d = 'M' + (curve.c[(n - 1) * 3 + 2].x * size).toFixed(3) +
         ' ' + (curve.c[(n - 1) * 3 + 2].y * size).toFixed(3) + ' ';
     for (i=0; i<n; ++i)
     {
         if (curve.tag[i] === "CURVETO")
         {
-            p += svg_curveto(curve, i, size);
-            cnt += 3;
+            d += svg_curveto(curve, i, size);
+            l += 3;
         }
         else if (curve.tag[i] === "CORNER")
         {
-            p += svg_lineto(curve, i, size);
-            cnt += 2;
+            d += svg_lineto(curve, i, size);
+            l += 2;
         }
     }
-    p += 'z ';
-    return cnt < minpathsegments ? '' : p;
+    d += 'z ';
+    for (path=path.childlist; path; path=path.sibling)
+    {
+        c = svg_path(path, size);
+        d += c.d;
+        l += c.l;
+    }
+    return {d:d, l:l};
 }
 function svg_curveto(curve, i, size)
 {

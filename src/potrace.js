@@ -6,13 +6,13 @@ var potrace = {VERSION: "1.16"},
     PROTO = 'prototype', stdMath = Math,
     IMG = 'undefined' !== typeof Uint8Array ? Uint8Array : Array,
     defaults = {
+        connectedcomponents: true,
+        minpathsegments: 2,
         turnpolicy: "minority",
         turdsize: 2,
         optcurve: true,
         alphamax: 1,
-        opttolerance: 0.2,
-        minpathsegments: 2,
-        connectedcomponents: true
+        opttolerance: 0.2
     }
 ;
 
@@ -73,9 +73,8 @@ function svg(width, height, pathlist, options)
         color_opacity = options.opacity || '1.0',
         outline = options.outline,
         full = !options.partial,
-        w = width * scale, h = height * scale,
+        w = width*scale, h = height*scale,
         path_style, svg_code = '';
-
     if (outline)
     {
         path_style = 'stroke="' + (color) + '" stroke-opacity="' + (color_opacity) + '" stroke-width="' + (outline) + '" fill="none"';
@@ -89,41 +88,49 @@ function svg(width, height, pathlist, options)
     if (full) svg_code += '</svg>';
     return svg_code;
 }
-function svg_pathlist(path, path_style, scale, minpathsegments, connectedcomponents, partial)
+function svg_pathlist(path, path_style, scale, minpathsegments, connectedcomponents)
 {
     if (!path) return '';
-    var svg_code = '';
-    if (!connectedcomponents && !partial) svg_code += '<path ' + path_style + ' d="';
+    var svg_code = '', svgpath;
+    if (!connectedcomponents) svg_code += '<path ' + path_style + ' d="';
     for (; path; path=path.sibling)
     {
-        svg_code += partial ? '' : (connectedcomponents ? ('<path ' + path_style + ' d="') : '');
-        svg_code += svg_path(path.curve, scale, minpathsegments);
-        svg_code += svg_pathlist(path.childlist, path_style, scale, minpathsegments, connectedcomponents, true);
-        svg_code += partial ? '' : (connectedcomponents ? '" />' : '');
+        svgpath = svg_path(path, scale);
+        if (svgpath.l < minpathsegments) continue;
+        if (connectedcomponents) svg_code += '<path ' + path_style + ' d="';
+        svg_code += svgpath.d;
+        if (connectedcomponents) svg_code += '" />';
     }
-    if (!connectedcomponents && !partial) svg_code += '" />';
+    if (!connectedcomponents) svg_code += '" />';
     return svg_code;
 }
-function svg_path(curve, size, minpathsegments)
+function svg_path(path, size)
 {
-    var n = curve.n, i, cnt = 0,
-        p = 'M' + (curve.c[(n - 1) * 3 + 2].x * size).toFixed(3) +
+    if (!path) return {d:'', l:0};
+    var curve = path.curve, n = curve.n, i, c, l = 1,
+        d = 'M' + (curve.c[(n - 1) * 3 + 2].x * size).toFixed(3) +
         ' ' + (curve.c[(n - 1) * 3 + 2].y * size).toFixed(3) + ' ';
     for (i=0; i<n; ++i)
     {
         if (curve.tag[i] === "CURVETO")
         {
-            p += svg_curveto(curve, i, size);
-            cnt += 3;
+            d += svg_curveto(curve, i, size);
+            l += 3;
         }
         else if (curve.tag[i] === "CORNER")
         {
-            p += svg_lineto(curve, i, size);
-            cnt += 2;
+            d += svg_lineto(curve, i, size);
+            l += 2;
         }
     }
-    p += 'z ';
-    return cnt < minpathsegments ? '' : p;
+    d += 'z ';
+    for (path=path.childlist; path; path=path.sibling)
+    {
+        c = svg_path(path, size);
+        d += c.d;
+        l += c.l;
+    }
+    return {d:d, l:l};
 }
 function svg_curveto(curve, i, size)
 {

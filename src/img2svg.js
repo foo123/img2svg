@@ -33,7 +33,7 @@ function tosvg(img, w, h, options, params)
                 ia = img[i+3];
                 rgba = String(ig);
                 rgba += ','+rgba+','+rgba+','+String(ia);
-                colors[rgba] = [j, colors[rgba] || null];
+                colors[rgba] = {j:j, next:colors[rgba] || null};
             }
         }
     }
@@ -48,18 +48,17 @@ function tosvg(img, w, h, options, params)
                 ib = img[i+2];
                 ia = img[i+3];
                 rgba = String(ir)+','+String(ig)+','+String(ib)+','+String(ia);
-                colors[rgba] = [j, colors[rgba] || null];
+                colors[rgba] = {j:j, next:colors[rgba] || null};
             }
         }
     }
     for (rgba in colors)
     {
         //if (!Object.prototype.hasOwnProperty.call(colors, rgba)) continue;
-        p = colors[rgba];
-        if (p && p.length)
+        if (p = colors[rgba])
         {
             imgq = new IMG(size);
-            for (; null!=p; p=p[1]) imgq[p[0]] = 255;
+            for (; p; p=p.next) imgq[p.j] = 255;
             options.color = 'rgb('+rgba.split(',').slice(0, 3).join(',')+')';
             options.opacity = String(((+(rgba.split(',').pop()))/255).toFixed(2));
             options.partial = true;
@@ -97,7 +96,7 @@ function tosvg_hue(img, w, h, options)
             hG[h] = (hG[h] || 0) + ig;
             hB[h] = (hB[h] || 0) + ib;
             area[h] = (area[h] || 0) + 1;
-            pos[h] = [j, pos[h] || null];
+            pos[h] = {j:j, next:pos[h] || null};
         }
     }
     for (h=0; h<depthHue; ++h)
@@ -105,8 +104,7 @@ function tosvg_hue(img, w, h, options)
         if (0 < area[h])
         {
             imgq = new IMG(size);
-            p = pos[h];
-            for (p=pos[h]; null!=p; p=p[1]) imgq[p[0]] = 255;
+            for (p=pos[h]; p; p=p.next) imgq[p.j] = 255;
             options.color = hex(255*hR[h]/area[h], 255*hG[h]/area[h], 255*hB[h]/area[h]);
             options.partial = true;
             paths += potrace.trace(imgq, w, h, options);

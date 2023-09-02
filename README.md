@@ -9,12 +9,13 @@ Vectorize Image Data to SVG using potrace algorithm v.1.16 with color
 ```js
 const CanvasLite = require('./CanvasLite.js');
 const img2svg = require('../build/img2svg.js');
-const img = new CanvasLite.Image();
+const img = new CanvasLite.Image(), canvas = new CanvasLite();
 img.onload = () => {
-    const canvas = new CanvasLite(img.width, img.height);
+    canvas.width = img.width;
+    canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    console.log(img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:7}));
+    console.log(img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:2}));
 };
 img.src = __dirname + '/test.jpeg';
 ```
@@ -34,7 +35,7 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    const svg = img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:7});
+    const svg = img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:2});
     document.body.appendChild(img);
     document.body.appendChild(el(svg));
 };
@@ -44,3 +45,21 @@ img.src = './test.jpeg';
 **Result:**
 
 ![img2svg demo](./img2svg.png)
+
+
+**Options:**
+
+* `mode`: "hue" | "gray" (for grayscale images) | "color" (default)
+* `depth`: depth of color quantization (default 2)
+* `depthR`,`depthG`,`depthB`,`depthA`: depth per separate image channel (default `depth`)
+
+**POTRACE Options:**
+
+* `connectedcomponents`: (separate disconnected paths) true (default)
+* `minpathsegments`: (minimum number of path points) 2 (default)
+* `turnpolicy`: "left" | "right" | "black" | "white" | "majority" | "minority" (default)
+* `turdsize`: (minimum area to trace) 2 (default)
+* `alphamax`: (balance between more curves vs more corners) 1 (default)
+* `optcurve`: (generate optimum curves) true (default)
+* `opttolerance`: (tolerance for optimum curves) 0.2 (default)
+
