@@ -63,3 +63,18 @@ img.src = './test.jpeg';
 * `optcurve`: (generate optimum curves) true (default)
 * `opttolerance`: (tolerance for optimum curves) 0.2 (default)
 
+**see also:**
+
+* [CanvasLite](https://github.com/foo123/CanvasLite) an html canvas implementation in pure JavaScript
+* [Rasterizer](https://github.com/foo123/Rasterizer) stroke and fill lines, rectangles, curves and paths, without canvaσ
+* [Gradient](https://github.com/foo123/Gradient) create linear, radial, conic and elliptic gradients and image patterns without canvas
+* [Geometrize](https://github.com/foo123/Geometrize) Computational Geometry and Rendering Library for JavaScript
+* [Plot.js](https://github.com/foo123/Plot.js) simple and small library which can plot graphs of functions and various simple charts and can render to Canvas, SVG and plain HTML
+* [MOD3](https://github.com/foo123/MOD3) 3D Modifier Library in JavaScript
+* [HAAR.js](https://github.com/foo123/HAAR.js) image feature detection based on Haar Cascades in JavaScript (Viola-Jones-Lienhart et al Algorithm)
+* [HAARPHP](https://github.com/foo123/HAARPHP) image feature detection based on Haar Cascades in PHP (Viola-Jones-Lienhart et al Algorithm)
+* [FILTER.js](https://github.com/foo123/FILTER.js) video and image processing and computer vision Library in pure JavaScript (browser and node)
+* [css-color](https://github.com/foo123/css-color) simple class to parse and manipulate colors in various formats
+* [img2svg](https://github.com/foo123/img2svg) vectorize image data to svg
+* [svg2json](https://github.com/foo123/svg2json) parse svg to json
+
