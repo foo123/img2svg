@@ -2,7 +2,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-02 19:58:54
+*   @built on 2023-09-04 21:12:18
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -11,7 +11,7 @@
 *
 *   img2svg.js
 *   @version: 1.0.0
-*   @built on 2023-09-02 19:58:54
+*   @built on 2023-09-04 21:12:18
 *
 *   Vectorize image data based on potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -287,7 +287,7 @@ potrace.trace = function(imgBW, width, height, options) {
     var bm = new Bitmap(width, height, imgBW);
     var pathlist = bm_to_pathlist(bm, options);
     bm = null;
-    process_path(pathlist, options);
+    pathlist = process_path(pathlist, options);
     return svg(width, height, pathlist, options);
 };
 potrace.process = potrace.trace;
@@ -311,14 +311,13 @@ function bm_to_pathlist(bm, params)
             prevpath = path;
         }
     }
-    if (params.connectedcomponents) pathlist = pathlist_to_connectedcomponents(pathlist);
-    //else if (params.tree) pathlist = pathlist_to_tree(pathlist, bm1);
+    //if (params.tree) pathlist = pathlist_to_tree(pathlist, bm1);
     bm1 = null;
     return pathlist;
 }
 function process_path(pathlist, params)
 {
-    for (var path = pathlist; path; path=path.next)
+    for (var path=pathlist; path; path=path.next)
     {
         calc_sums(path);
         calc_lon(path);
@@ -328,6 +327,8 @@ function process_path(pathlist, params)
         smooth(path, params);
         if (params.optcurve) opticurve(path, params);
     }
+    if (params.connectedcomponents) pathlist = pathlist_to_connectedcomponents(pathlist);
+    return pathlist;
 }
 function svg(width, height, pathlist, options)
 {
@@ -356,8 +357,9 @@ function svg_pathlist(path, path_style, scale, minpathsegments, connectedcompone
     if (!path) return '';
     var svg_code = '', svgpath;
     if (!connectedcomponents) svg_code += '<path ' + path_style + ' d="';
-    for (; path; path=path.sibling)
+    for (; path; path=path.next)
     {
+        if (path.isChild) continue;
         svgpath = svg_path(path, scale);
         if (svgpath.l < minpathsegments) continue;
         if (connectedcomponents) svg_code += '<path ' + path_style + ' d="';
@@ -370,7 +372,7 @@ function svg_pathlist(path, path_style, scale, minpathsegments, connectedcompone
 function svg_path(path, size)
 {
     if (!path) return {d:'', l:0};
-    var curve = path.curve, n = curve.n, i, c, l = 1,
+    var curve = path.curve, n = curve.n, i, c, l = 0,
         d = 'M' + (curve.c[(n - 1) * 3 + 2].x * size).toFixed(3) +
         ' ' + (curve.c[(n - 1) * 3 + 2].y * size).toFixed(3) + ' ';
     for (i=0; i<n; ++i)
@@ -411,15 +413,6 @@ function svg_lineto(curve, i, size)
         (curve.c[i * 3 + 2].x * size).toFixed(3) + ' ' +
         (curve.c[i * 3 + 2].y * size).toFixed(3) + ' ';
 }
-function extend(obj, defaults)
-{
-    for (var k in defaults)
-    {
-        if (Object[PROTO].hasOwnProperty.call(defaults, k) && !Object[PROTO].hasOwnProperty.call(obj, k))
-            obj[k] = defaults[k];
-    }
-    return obj;
-}
 function Point(x, y)
 {
     var self = this;
@@ -430,6 +423,8 @@ Point[PROTO] = {
     constructor: Point,
     x: 0,
     y: 0,
+    //prev: null,
+    //next: null,
     copy: function() {
         return new Point(this.x, this.y);
     }
@@ -527,7 +522,20 @@ Path[PROTO] = {
     maxY: -1,
     next: null,
     sibling: null,
-    childlist: null
+    childlist: null,
+    isChild: false,
+    copy: function() {
+        var self = this, cpy = new Path();
+        cpy.area = self.area;
+        cpy.len = self.len;
+        cpy.curve = self.curve;
+        cpy.pt = self.pt;
+        cpy.minX = self.minX;
+        cpy.minY = self.minY;
+        cpy.maxX = self.maxX;
+        cpy.maxY = self.maxY;
+        return cpy;
+    }
 };
 function Curve(n)
 {
@@ -598,6 +606,15 @@ Opti[PROTO] = {
     alpha: 0
 };
 
+function extend(obj, defaults)
+{
+    for (var k in defaults)
+    {
+        if (Object[PROTO].hasOwnProperty.call(defaults, k) && !Object[PROTO].hasOwnProperty.call(obj, k))
+            obj[k] = defaults[k];
+    }
+    return obj;
+}
 function findnext(bm1, point)
 {
     var i = bm1.toIndex(point);
@@ -852,25 +869,21 @@ function intersect(path1, path2)
 }
 function pathlist_to_connectedcomponents(plist)
 {
-    var p1, p2, pc1, pp2;
-    for (p1=plist; p1; p1=p1.sibling)
+    var p1, p2, pc1, pp;
+    for (p1=plist; p1; p1=p1.next)
     {
-        pc1 = null;//p1.childlist;
-        for (pp2=p1,p2=p1.next; p2;)
+        if (p1.isChild) continue;
+        pc1 = null;
+        for (p2=p1.next; p2; p2=p2.next)
         {
+            if (p2.isChild) continue;
             if (intersect(p1, p2))
             {
-                pp2.sibling = p2.sibling;
-                p2.sibling = null;
-                if (pc1) pc1.sibling = p2;
-                else p1.childlist = p2;
-                pc1 = p2;
-                p2 = pp2.sibling;
-            }
-            else
-            {
-                pp2 = p2;
-                p2 = p2.sibling;
+                p2.isChild = true;
+                pp = p2.copy();
+                if (pc1) pc1.sibling = pp;
+                else p1.childlist = pp;
+                pc1 = pp;
             }
         }
     }
