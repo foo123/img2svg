@@ -8,7 +8,7 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    console.log(img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:2}));
+    console.log(img2svg(imgData, {depth:16}));
 };
 img.src = __dirname + '/test.jpeg';
 

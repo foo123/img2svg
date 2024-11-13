@@ -1,40 +1,3 @@
-/**
-*
-*   img2svg.js
-*   @version: 2.0.0
-*   @built on 2024-11-13 12:06:13
-*
-*   Vectorize image data based on multilabel-potrace algorithm with color
-*   https://github.com/foo123/img2svg.js
-*
-**//**
-*
-*   img2svg.js
-*   @version: 2.0.0
-*   @built on 2024-11-13 12:06:13
-*
-*   Vectorize image data based on multilabel-potrace algorithm with color
-*   https://github.com/foo123/img2svg.js
-*
-**/
-!function(root, name, factory) {
-"use strict";
-if (('object' === typeof module) && module.exports) /* CommonJS */
-    (module.$deps = module.$deps||{}) && (module.exports = module.$deps[name] = factory.call(root));
-else if (('function' === typeof define) && define.amd && ('function' === typeof require) && ('function' === typeof require.specified) && require.specified(name) /*&& !require.defined(name)*/ ) /* AMD */
-    define(name, ['module'], function(module) {factory.moduleUri = module.uri; return factory.call(root);});
-else if (!(name in root)) /* Browser/WebWorker/.. */
-    (root[name] = factory.call(root)||1) && ('function' ===typeof define) && define.amd && define(function() {return root[name];});
-}(  /* current root */          'undefined' !== typeof self ? self : this, 
-    /* module name */           "img2svg",
-    /* module factory */        function ModuleFactory__img2svg() {
-/* main code starts here */
-"use strict";
-function img2svg(imageData, options)
-{
-    return multilabel_potrace.trace(imageData.data, imageData.width, imageData.height, options || {});
-}
-img2svg.VERSION = "2.0.0";
 var multilabel_potrace = (function() {
 // adapted from:
 // multilabel-potrace 2020 https://gitlab.com/1a7r0ch3/multilabel-potrace
@@ -2422,8 +2385,3 @@ function tangent(p0, p1, p2, p3, q0, q1)
 
 return multilabel_potrace;
 })();
-img2svg.potrace = multilabel_potrace;
-/* main code ends here */
-/* export the module */
-return img2svg;
-});

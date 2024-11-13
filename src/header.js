@@ -4,7 +4,7 @@
 *   @version: @@VERSION@@
 *   @built on @@DATE@@
 *
-*   Vectorize image data based on potrace algorithm with color
+*   Vectorize image data based on multilabel-potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
 *
 **/

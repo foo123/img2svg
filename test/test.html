@@ -18,7 +18,7 @@ body {
 function el(html)
 {
     const container = document.createElement('div');
-    container.innerHTML = html;
+    container.innerHTML = html.trim();
     return container.firstChild;
 }
 const img = new Image(), canvas = document.createElement('canvas');
@@ -27,11 +27,11 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    const svg = img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:2});
+    const svg = img2svg(imgData, {depth:16});
     document.body.appendChild(img);
     document.body.appendChild(el(svg));
 };
-img.src = './test.jpeg';
+img.src = './test.jpeg';//'./peacecolor2.png';'./svgcode.png';
 })();
 </script>
 </body>

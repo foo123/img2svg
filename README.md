@@ -1,8 +1,9 @@
 # img2svg
 
-Vectorize Image Data to SVG using potrace algorithm v.1.16 with color
+Vectorize Image Data to SVG using POTRACE
+Based on [multilabel-potrace by Hugo Raguet](https://gitlab.com/1a7r0ch3/multilabel-potrace), which is based on [potrace by Peter Selinger](https://potrace.sourceforge.net/)
 
-**version 1.0.0** (17 kB minified)
+**version 2.0.0** (25 kB minified)
 
 **demo in nodejs with `CanvasLite`:**
 
@@ -15,7 +16,7 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    console.log(img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:2}));
+    console.log(img2svg(imgData, {depth:16}));
 };
 img.src = __dirname + '/test.jpeg';
 ```
@@ -26,7 +27,7 @@ img.src = __dirname + '/test.jpeg';
 function el(html)
 {
     const container = document.createElement('div');
-    container.innerHTML = html;
+    container.innerHTML = html.trim();
     return container.firstChild;
 }
 const img = new Image(), canvas = document.createElement('canvas');
@@ -35,7 +36,7 @@ img.onload = () => {
     canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     const imgData = canvas.getContext('2d').getImageData(0, 0, img.width, img.height);
-    const svg = img2svg(imgData, {mode:"color",depth:5,turdsize:0,minpathsegments:2});
+    const svg = img2svg(imgData, {depth:16});
     document.body.appendChild(img);
     document.body.appendChild(el(svg));
 };
@@ -49,19 +50,19 @@ img.src = './test.jpeg';
 
 **Options:**
 
-* `mode`: "hue" | "gray" (for grayscale images) | "color" (default)
-* `depth`: depth of color quantization (default 2)
-* `depthR`,`depthG`,`depthB`,`depthA`: depth per separate image channel (default `depth`)
+* `depth`: depth of color quantization for all channels (default 16)
+* `depthR`,`depthG`,`depthB`: depth of color quantization per separate image channel (default `depth`)
+* `transparency`: level of ALPHA channel, from 0 to 100, under which area is considered transparent and is ignored (default 50)
+* `layered`: separate into layers of overlapping connected components instead of isolated connected components (default false)
+* `outline`: line width to generate outline of image only (default 0)
 
 **POTRACE Options:**
 
-* `connectedcomponents`: (separate disconnected paths) true (default)
-* `minpathsegments`: (minimum number of path points) 2 (default)
-* `turnpolicy`: "left" | "right" | "black" | "white" | "majority" | "minority" (default)
-* `turdsize`: (minimum area to trace) 2 (default)
-* `alphamax`: (balance between more curves vs more corners) 1 (default)
-* `optcurve`: (generate optimum curves) true (default)
-* `opttolerance`: (tolerance for optimum curves) 0.2 (default)
+* `minpathsegments`: ignore areas with less number of segments than this (default 0)
+* `turdsize`: ignore areas with size smaller or equal to this (default 0)
+* `linetolerance`: straight line tolerance (default 0.5)
+* `alphamax`: balance between more smooth curves vs more lines and corners (default 1.0)
+* `opttolerance`: tolerance for generating optimum curves if > 0.0 (default 0.2)
 
 **see also:**
 

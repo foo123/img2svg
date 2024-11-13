@@ -16,7 +16,7 @@
 
                 "./src/header.js",
                 "./src/img2svg.js",
-                "./src/potrace.js",
+                "./src/multilabel_potrace.js",
                 "./src/footer.js"
 
             ]},
@@ -25,7 +25,7 @@
 
             {"replace": [
 
-                {"@@VERSION@@": "1.0.0"},
+                {"@@VERSION@@": "2.0.0"},
                 {"@@DATE@@": "Xpresion::date(\"Y-m-d H:i:s\")"}
 
             ]},
