@@ -25,7 +25,7 @@
 
             {"replace": [
 
-                {"@@VERSION@@": "2.0.0"},
+                {"@@VERSION@@": "2.0.1"},
                 {"@@DATE@@": "Xpresion::date(\"Y-m-d H:i:s\")"}
 
             ]},

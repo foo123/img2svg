@@ -1,9 +1,10 @@
 # img2svg
 
-Vectorize Image Data to SVG using POTRACE
+Vectorize Image Data to SVG using POTRACE  
+
 Based on [multilabel-potrace by Hugo Raguet](https://gitlab.com/1a7r0ch3/multilabel-potrace), which is based on [potrace by Peter Selinger](https://potrace.sourceforge.net/)
 
-**version 2.0.0** (25 kB minified)
+**version 2.0.1** (25 kB minified)
 
 **demo in nodejs with `CanvasLite`:**
 
@@ -50,19 +51,20 @@ img.src = './test.jpeg';
 
 **Options:**
 
-* `depth`: depth of color quantization for all channels (default 16)
+* `depth`: depth of color quantization for all channels (default `16`)
 * `depthR`,`depthG`,`depthB`: depth of color quantization per separate image channel (default `depth`)
-* `transparency`: level of ALPHA channel, from 0 to 100, under which area is considered transparent and is ignored (default 50)
-* `layered`: separate into layers of overlapping connected components instead of isolated connected components (default false)
-* `outline`: line width to generate outline of image only (default 0)
+* `transparency`: level of ALPHA channel, from 0 to 100, under which area is considered transparent and is ignored (default `50`)
+* `layered`: separate into layers of overlapping connected components instead of isolated connected components (default `false`)
+* `outline`: line width to generate outline of image only (default `0`)
+* `outlinecolor`: line color to generate outline of image if set, else the color of the area is used (default `null`)
 
 **POTRACE Options:**
 
-* `minpathsegments`: ignore areas with less number of segments than this (default 0)
-* `turdsize`: ignore areas with size smaller or equal to this (default 0)
-* `linetolerance`: straight line tolerance (default 0.5)
-* `alphamax`: balance between more smooth curves vs more lines and corners (default 1.0)
-* `opttolerance`: tolerance for generating optimum curves if > 0.0 (default 0.2)
+* `minpathsegments`: ignore areas with less number of segments than this (default `0`)
+* `turdsize`: ignore areas with size smaller or equal to this (default `0`)
+* `linetolerance`: straight line tolerance (default `0.5`)
+* `alphamax`: balance between more smooth curves vs more lines and corners (default `1.0`)
+* `opttolerance`: tolerance for generating optimum curves if > 0.0 (default `0.2`)
 
 **see also:**
 

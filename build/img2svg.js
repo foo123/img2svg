@@ -1,8 +1,8 @@
 /**
 *
 *   img2svg.js
-*   @version: 2.0.0
-*   @built on 2024-11-13 12:06:13
+*   @version: 2.0.1
+*   @built on 2025-01-17 15:27:28
 *
 *   Vectorize image data based on multilabel-potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -10,8 +10,8 @@
 **//**
 *
 *   img2svg.js
-*   @version: 2.0.0
-*   @built on 2024-11-13 12:06:13
+*   @version: 2.0.1
+*   @built on 2025-01-17 15:27:28
 *
 *   Vectorize image data based on multilabel-potrace algorithm with color
 *   https://github.com/foo123/img2svg.js
@@ -34,7 +34,7 @@ function img2svg(imageData, options)
 {
     return multilabel_potrace.trace(imageData.data, imageData.width, imageData.height, options || {});
 }
-img2svg.VERSION = "2.0.0";
+img2svg.VERSION = "2.0.1";
 var multilabel_potrace = (function() {
 // adapted from:
 // multilabel-potrace 2020 https://gitlab.com/1a7r0ch3/multilabel-potrace
@@ -43,6 +43,7 @@ var multilabel_potrace = {MULTILABEL_POTRACE_VERSION: "2020", POTRACE_VERSION: "
 multilabel_potrace.defaultOptions = function() {
     return {
     outline: 0,
+    outlinecolor: null,
     depth: 16,
     transparency: 50,
     layered: false,
@@ -518,7 +519,7 @@ function svg(bm, contours, params)
                 o.thiscomponent = component[c];
                 if (params.outline)
                 {
-                    svg += draw_contour(contours[comp], comp, o, 'none', color, params.outline);
+                    svg += draw_contour(contours[comp], comp, o, 'none', params.outlinecolor || color, params.outline);
                 }
                 else
                 {

@@ -6,6 +6,7 @@ var multilabel_potrace = {MULTILABEL_POTRACE_VERSION: "2020", POTRACE_VERSION: "
 multilabel_potrace.defaultOptions = function() {
     return {
     outline: 0,
+    outlinecolor: null,
     depth: 16,
     transparency: 50,
     layered: false,
@@ -481,7 +482,7 @@ function svg(bm, contours, params)
                 o.thiscomponent = component[c];
                 if (params.outline)
                 {
-                    svg += draw_contour(contours[comp], comp, o, 'none', color, params.outline);
+                    svg += draw_contour(contours[comp], comp, o, 'none', params.outlinecolor || color, params.outline);
                 }
                 else
                 {
